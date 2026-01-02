@@ -36,3 +36,12 @@ Thumbs.db
 # Cursor/SpecStory
 .specstory/
 .cursorindexingignore
+
+# Working/scratch files
+CLAUDE.md
+help.md
+interview.md
+link-problem.md
+markdown-features.md
+tiki.md
+tview
