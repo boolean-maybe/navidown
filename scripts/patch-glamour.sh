@@ -5,8 +5,11 @@
 #
 # This script:
 # 1. Downloads a fresh copy of glamour (specified version or latest)
-# 2. Applies the marker injection patches for link and header position tracking
-# 3. Runs tests to verify the patches work correctly
+# 2. Removes glamour's go.mod/go.sum (integrates into main module)
+# 3. Applies the marker injection patches for link and header position tracking
+# 4. Updates all import paths to use the local module path
+# 5. Runs go mod tidy to clean up dependencies
+# 6. Runs tests to verify the patches work correctly
 #
 # The patches inject invisible Unicode markers around link text and headers
 # during glamour's rendering process. These markers enable 100% reliable
@@ -50,6 +53,11 @@ git clone --depth 1 --branch "$VERSION" https://github.com/charmbracelet/glamour
 # Remove .git directory (we're vendoring, not maintaining a submodule)
 rm -rf "$GLAMOUR_DIR/.git"
 
+# Remove glamour's go.mod (integrate into main module)
+echo ""
+echo "Removing glamour's go.mod files..."
+rm -f "$GLAMOUR_DIR/go.mod" "$GLAMOUR_DIR/go.sum"
+
 # Apply patches
 echo ""
 echo "Applying marker patches..."
@@ -69,6 +77,17 @@ if ! patch -p1 -d "$GLAMOUR_DIR" < "$PATCH_DIR/heading-markers.patch"; then
     echo "You may need to manually update the patch."
     exit 1
 fi
+
+# Update import paths to use local module
+echo ""
+echo "Updating import paths to use local module..."
+find "$GLAMOUR_DIR" -name "*.go" -type f -exec sed -i '' 's|github\.com/charmbracelet/glamour|github.com/boolean-maybe/navidown/glamour|g' {} \;
+
+# Clean up dependencies
+echo ""
+echo "Cleaning up go.mod dependencies..."
+cd "$PROJECT_ROOT"
+go mod tidy
 
 # Verify build
 echo ""
@@ -96,6 +115,9 @@ echo ""
 echo "=== Success ==="
 echo "Glamour $VERSION has been updated with marker patches applied."
 echo ""
-echo "Modified files:"
+echo "Changes applied:"
 echo "  - glamour/ansi/link.go (link text markers)"
 echo "  - glamour/ansi/heading.go (header markers with level encoding)"
+echo "  - Removed glamour/go.mod and glamour/go.sum (integrated into main module)"
+echo "  - Updated all import paths to github.com/boolean-maybe/navidown/glamour"
+echo "  - Cleaned up go.mod dependencies"

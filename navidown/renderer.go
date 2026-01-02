@@ -4,9 +4,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/glamour/ansi"
-	"github.com/charmbracelet/glamour/styles"
+	"github.com/boolean-maybe/navidown/glamour"
+	"github.com/boolean-maybe/navidown/glamour/ansi"
+	"github.com/boolean-maybe/navidown/glamour/styles"
 )
 
 // RenderResult is the rendered representation used by the viewer.
