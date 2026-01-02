@@ -9,6 +9,7 @@ import (
 	"github.com/boolean-maybe/navidown/loaders"
 	"github.com/boolean-maybe/navidown/navidown"
 	tviewAdapter "github.com/boolean-maybe/navidown/navidown/tview"
+	"github.com/boolean-maybe/navidown/util"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -34,6 +35,9 @@ func main() {
 
 	// Create markdown viewer
 	mdViewer := tviewAdapter.New()
+
+	// Set custom ANSI converter for proper background color support
+	mdViewer.SetAnsiConverter(util.NewAnsiConverter(true))
 
 	// Set up content fetcher for link navigation
 	provider := &loaders.FileHTTP{SearchRoots: []string{"."}}

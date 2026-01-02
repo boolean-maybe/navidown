@@ -120,6 +120,10 @@ func (v *Viewer) refreshDisplayCache() {
 	} else {
 		converted = tview.TranslateANSI(joined)
 	}
+
+	// Strip invisible markers from display lines - they're only used for position calculation
+	converted = nav.StripMarkers(converted)
+
 	v.displayLines = strings.Split(converted, "\n")
 }
 

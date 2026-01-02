@@ -1,0 +1,101 @@
+#!/bin/bash
+# patch-glamour.sh - Updates vendored glamour and re-applies marker patches
+#
+# Usage: ./scripts/patch-glamour.sh [glamour-version]
+#
+# This script:
+# 1. Downloads a fresh copy of glamour (specified version or latest)
+# 2. Applies the marker injection patches for link and header position tracking
+# 3. Runs tests to verify the patches work correctly
+#
+# The patches inject invisible Unicode markers around link text and headers
+# during glamour's rendering process. These markers enable 100% reliable
+# position detection for navigation purposes.
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+GLAMOUR_DIR="$PROJECT_ROOT/glamour"
+PATCH_DIR="$SCRIPT_DIR/glamour-patches"
+
+VERSION="${1:-v0.10.0}"
+
+echo "=== Glamour Patch Script ==="
+echo "Version: $VERSION"
+echo "Glamour dir: $GLAMOUR_DIR"
+echo "Patch dir: $PATCH_DIR"
+echo ""
+
+# Check if patches exist
+if [[ ! -f "$PATCH_DIR/link-markers.patch" ]] || [[ ! -f "$PATCH_DIR/heading-markers.patch" ]]; then
+    echo "ERROR: Patch files not found in $PATCH_DIR"
+    echo "Expected:"
+    echo "  - $PATCH_DIR/link-markers.patch"
+    echo "  - $PATCH_DIR/heading-markers.patch"
+    exit 1
+fi
+
+# Backup existing glamour if it exists
+if [[ -d "$GLAMOUR_DIR" ]]; then
+    echo "Backing up existing glamour directory..."
+    rm -rf "$GLAMOUR_DIR.bak"
+    mv "$GLAMOUR_DIR" "$GLAMOUR_DIR.bak"
+fi
+
+# Clone glamour
+echo "Downloading glamour $VERSION..."
+git clone --depth 1 --branch "$VERSION" https://github.com/charmbracelet/glamour.git "$GLAMOUR_DIR" 2>&1
+
+# Remove .git directory (we're vendoring, not maintaining a submodule)
+rm -rf "$GLAMOUR_DIR/.git"
+
+# Apply patches
+echo ""
+echo "Applying marker patches..."
+
+echo "  - link-markers.patch"
+if ! patch -p1 -d "$GLAMOUR_DIR" < "$PATCH_DIR/link-markers.patch"; then
+    echo "ERROR: Failed to apply link-markers.patch"
+    echo "The patch may be incompatible with glamour $VERSION"
+    echo "You may need to manually update the patch."
+    exit 1
+fi
+
+echo "  - heading-markers.patch"
+if ! patch -p1 -d "$GLAMOUR_DIR" < "$PATCH_DIR/heading-markers.patch"; then
+    echo "ERROR: Failed to apply heading-markers.patch"
+    echo "The patch may be incompatible with glamour $VERSION"
+    echo "You may need to manually update the patch."
+    exit 1
+fi
+
+# Verify build
+echo ""
+echo "Verifying build..."
+cd "$PROJECT_ROOT"
+if ! go build ./...; then
+    echo "ERROR: Build failed after applying patches"
+    exit 1
+fi
+
+# Run tests
+echo ""
+echo "Running tests..."
+if ! go test ./navidown/...; then
+    echo "ERROR: Tests failed after applying patches"
+    exit 1
+fi
+
+# Cleanup backup
+if [[ -d "$GLAMOUR_DIR.bak" ]]; then
+    rm -rf "$GLAMOUR_DIR.bak"
+fi
+
+echo ""
+echo "=== Success ==="
+echo "Glamour $VERSION has been updated with marker patches applied."
+echo ""
+echo "Modified files:"
+echo "  - glamour/ansi/link.go (link text markers)"
+echo "  - glamour/ansi/heading.go (header markers with level encoding)"

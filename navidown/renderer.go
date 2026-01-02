@@ -56,6 +56,12 @@ func stripANSI(s string) string {
 	return ansiSGRPattern.ReplaceAllString(s, "")
 }
 
+// stripANSIAndMarkers removes both ANSI escape sequences and marker characters.
+func stripANSIAndMarkers(s string) string {
+	s = ansiSGRPattern.ReplaceAllString(s, "")
+	return StripMarkers(s)
+}
+
 func (r *ANSIStyleRenderer) Render(markdown string) (RenderResult, error) {
 	tr, err := glamour.NewTermRenderer(
 		glamour.WithStyles(r.glamourStyle),
@@ -73,6 +79,6 @@ func (r *ANSIStyleRenderer) Render(markdown string) (RenderResult, error) {
 	lines := strings.Split(out, "\n")
 	return RenderResult{
 		Lines:   lines,
-		Cleaner: LineCleanerFunc(stripANSI),
+		Cleaner: LineCleanerFunc(stripANSIAndMarkers),
 	}, nil
 }

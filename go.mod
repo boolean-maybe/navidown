@@ -2,6 +2,8 @@ module github.com/boolean-maybe/navidown
 
 go 1.24.2
 
+replace github.com/charmbracelet/glamour => ./glamour
+
 require (
 	github.com/charmbracelet/glamour v0.10.0
 	github.com/gdamore/tcell/v2 v2.13.5

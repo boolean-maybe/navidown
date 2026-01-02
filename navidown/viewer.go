@@ -46,7 +46,7 @@ func New(opts Options) *Viewer {
 	}
 	correlator := opts.Correlator
 	if correlator == nil {
-		correlator = NewScoringCorrelator()
+		correlator = NewMarkerCorrelator()
 	}
 	hmax := opts.HistoryMax
 	if hmax <= 0 {
@@ -65,7 +65,7 @@ func New(opts Options) *Viewer {
 // SetCorrelator sets the correlation strategy.
 func (v *Viewer) SetCorrelator(c PositionCorrelator) {
 	if c == nil {
-		c = NewScoringCorrelator()
+		c = NewMarkerCorrelator()
 	}
 	v.correlator = c
 }
@@ -207,6 +207,11 @@ func (v *Viewer) parseMarkdownWithSource(source []byte, sourceFilePath string) [
 func (v *Viewer) correlatePositions() {
 	if len(v.elements) == 0 || len(v.renderedLines) == 0 {
 		return
+	}
+
+	// Reset marker correlator state if applicable
+	if mc, ok := v.correlator.(*MarkerCorrelator); ok {
+		mc.Reset()
 	}
 
 	usedPositions := make(map[string]int)

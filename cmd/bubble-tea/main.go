@@ -41,7 +41,7 @@ func main() {
 	// Create core viewer
 	viewer := navidown.New(navidown.Options{
 		Renderer:   navidown.NewANSIRenderer(),
-		Correlator: navidown.NewScoringCorrelator(),
+		Correlator: navidown.NewMarkerCorrelator(),
 		HistoryMax: 50,
 	})
 
@@ -179,13 +179,19 @@ func (m model) View() string {
 func (m *model) syncViewportContent() {
 	lines := m.viewer.RenderedLines()
 
+	// Strip markers from lines for display (markers are only used for position calculation)
+	displayLines := make([]string, len(lines))
+	for i, line := range lines {
+		displayLines[i] = navidown.StripMarkers(line)
+	}
+
 	// Add selection highlighting
 	if sel := m.viewer.Selected(); sel != nil && sel.Type == navidown.NavElementURL {
-		lines = m.addSelectionHighlight(lines, sel)
+		displayLines = m.addSelectionHighlight(displayLines, sel)
 	}
 
 	// Join lines and set viewport content
-	content := strings.Join(lines, "\n")
+	content := strings.Join(displayLines, "\n")
 	m.viewport.SetContent(content)
 
 	// Sync scroll position
@@ -254,7 +260,7 @@ func (m *model) addSelectionHighlight(lines []string, sel *navidown.NavElement) 
 	return newLines
 }
 
-// stripANSI removes ANSI escape sequences from a string
+// stripANSI removes ANSI escape sequences and marker characters from a string
 func stripANSI(s string) string {
 	var result strings.Builder
 	runes := []rune(s)
@@ -268,6 +274,11 @@ func stripANSI(s string) string {
 				i++
 			}
 			i++ // Skip 'm'
+			continue
+		}
+		// Skip marker characters
+		if navidown.IsMarkerRune(runes[i]) {
+			i++
 			continue
 		}
 		result.WriteRune(runes[i])
