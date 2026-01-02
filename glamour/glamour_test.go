@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/glamour/styles"
+	"github.com/boolean-maybe/navidown/glamour/styles"
 	"github.com/charmbracelet/x/exp/golden"
 )
 

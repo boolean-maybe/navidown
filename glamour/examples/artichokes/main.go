@@ -11,7 +11,7 @@ import (
 	"os"
 
 	"github.com/charmbracelet/colorprofile"
-	"github.com/charmbracelet/glamour"
+	"github.com/boolean-maybe/navidown/glamour"
 )
 
 //go:embed artichokes.md

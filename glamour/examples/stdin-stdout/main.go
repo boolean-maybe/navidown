@@ -14,7 +14,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/charmbracelet/glamour"
+	"github.com/boolean-maybe/navidown/glamour"
 )
 
 const defaultWidth = 80

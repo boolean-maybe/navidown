@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/charmbracelet/glamour/ansi"
-	styles "github.com/charmbracelet/glamour/styles"
+	"github.com/boolean-maybe/navidown/glamour/ansi"
+	styles "github.com/boolean-maybe/navidown/glamour/styles"
 )
 
 func writeStyleJSON(filename string, styleConfig *ansi.StyleConfig) error {

@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/charmbracelet/glamour"
+	"github.com/boolean-maybe/navidown/glamour"
 )
 
 func main() {
