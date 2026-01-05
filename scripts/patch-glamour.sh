@@ -106,6 +106,12 @@ if ! go test ./navidown/...; then
     exit 1
 fi
 
+# Update golden test files
+echo ""
+echo "Updating golden test files..."
+go test ./glamour/ansi -update
+go test ./glamour -update
+
 # Cleanup backup
 if [[ -d "$GLAMOUR_DIR.bak" ]]; then
     rm -rf "$GLAMOUR_DIR.bak"

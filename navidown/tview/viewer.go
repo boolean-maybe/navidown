@@ -23,6 +23,9 @@ type Viewer struct {
 	// ansiConverter is optional. If nil, falls back to tview.TranslateANSI.
 	ansiConverter *util.AnsiConverter
 
+	// backgroundColor is the color used to fill empty space. ColorDefault means no fill.
+	backgroundColor tcell.Color
+
 	onSelect       func(*Viewer, nav.NavElement)
 	onStateChanged func(*Viewer)
 }
@@ -33,8 +36,9 @@ func New() *Viewer {
 	box.SetBorder(false)
 
 	return &Viewer{
-		Box:  box,
-		core: nav.New(nav.Options{}),
+		Box:             box,
+		core:            nav.New(nav.Options{}),
+		backgroundColor: tcell.ColorDefault,
 	}
 }
 
@@ -45,6 +49,21 @@ func (v *Viewer) Core() *nav.Viewer { return v.core }
 func (v *Viewer) SetAnsiConverter(c *util.AnsiConverter) {
 	v.ansiConverter = c
 	v.refreshDisplayCache()
+}
+
+// SetBackgroundColor sets the background color for empty space.
+// Use tcell.ColorDefault to disable background filling (default behavior).
+func (v *Viewer) SetBackgroundColor(color tcell.Color) *Viewer {
+	v.backgroundColor = color
+	return v
+}
+
+// SetRenderer configures the renderer used by the core viewer.
+// This allows dynamic switching between light/dark styles.
+func (v *Viewer) SetRenderer(r nav.Renderer) *Viewer {
+	v.core.SetRenderer(r)
+	v.refreshDisplayCache()
+	return v
 }
 
 // SetSelectHandler sets the callback for when Enter is pressed on a selected element.
@@ -81,6 +100,16 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 	x, y, width, height := v.GetInnerRect()
 	if width <= 0 || height <= 0 {
 		return
+	}
+
+	// Fill background if configured
+	if v.backgroundColor != tcell.ColorDefault {
+		bgStyle := tcell.StyleDefault.Background(v.backgroundColor)
+		for row := 0; row < height; row++ {
+			for col := 0; col < width; col++ {
+				screen.SetContent(x+col, y+row, ' ', nil, bgStyle)
+			}
+		}
 	}
 
 	// Selected element info for highlighting.

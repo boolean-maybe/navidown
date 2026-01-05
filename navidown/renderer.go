@@ -1,7 +1,9 @@
 package navidown
 
 import (
+	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/boolean-maybe/navidown/glamour"
@@ -31,10 +33,29 @@ func uintPtr(v uint) *uint {
 	return &v
 }
 
-// NewANSIRenderer creates a renderer similar to the old pipeline:
-// markdown -> glamour ANSI output. By default it disables word-wrapping.
+// NewANSIRenderer creates a renderer with the dark style (backwards compatible default).
 func NewANSIRenderer() *ANSIStyleRenderer {
-	style := styles.DarkStyleConfig
+	return NewANSIRendererWithStyle("dark")
+}
+
+// NewANSIRendererWithStyle creates a renderer with the specified style.
+// styleName can be "dark", "light", or "auto".
+// "auto" uses COLORFGBG environment variable to detect terminal background.
+func NewANSIRendererWithStyle(styleName string) *ANSIStyleRenderer {
+	var style ansi.StyleConfig
+
+	switch styleName {
+	case "light":
+		style = styles.LightStyleConfig
+	case "auto":
+		style = detectStyleFromEnvironment()
+	case "dark":
+		fallthrough
+	default:
+		style = styles.DarkStyleConfig
+	}
+
+	// Always clear margins for consistent rendering
 	style.Document.Margin = uintPtr(0)
 	style.CodeBlock.Margin = uintPtr(0)
 
@@ -42,6 +63,37 @@ func NewANSIRenderer() *ANSIStyleRenderer {
 		glamourStyle: style,
 		wordWrap:     0,
 	}
+}
+
+// detectStyleFromEnvironment detects terminal theme using COLORFGBG.
+// Format: "foreground;background" (e.g., "15;0")
+// Background >= 8 indicates light background, < 8 indicates dark.
+// Defaults to dark on parse errors or missing variable.
+func detectStyleFromEnvironment() ansi.StyleConfig {
+	colorfgbg := os.Getenv("COLORFGBG")
+	if colorfgbg == "" {
+		return styles.DarkStyleConfig
+	}
+
+	// Parse format: "foreground;background"
+	parts := strings.Split(colorfgbg, ";")
+	if len(parts) < 2 {
+		return styles.DarkStyleConfig
+	}
+
+	// Get last component (background color)
+	bgStr := strings.TrimSpace(parts[len(parts)-1])
+	bg, err := strconv.Atoi(bgStr)
+	if err != nil {
+		return styles.DarkStyleConfig
+	}
+
+	// Background >= 8 means light background (colors 8-15 are bright)
+	if bg >= 8 {
+		return styles.LightStyleConfig
+	}
+
+	return styles.DarkStyleConfig
 }
 
 // WithWordWrap configures glamour word wrap (0 means no wrap).
