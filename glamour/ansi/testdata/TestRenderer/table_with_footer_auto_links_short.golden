@@ -1,26 +1,26 @@
                                                                                 
  Description                           │ Link                                   
 ───────────────────────────────────────┼──────────────────────────────────────  
- Issue                                 │ [38;5;35;1mowner/repo#123[1][0m                      
- Issue                                 │ [38;5;35;1mowner/repo#123[2][0m                      
- Issue Comment                         │ [38;5;35;1mowner/repo#123 (comment)[3][0m            
- Issue Comment                         │ [38;5;35;1mowner/repo#123 (comment)[4][0m            
- Pull Request                          │ [38;5;35;1mowner/repo#123[5][0m                      
- Pull Request                          │ [38;5;35;1mowner/repo#123[6][0m                      
- Pull Request Comment                  │ [38;5;35;1mowner/repo#123 (comment)[7][0m            
- Pull Request Comment                  │ [38;5;35;1mowner/repo#123 (comment)[8][0m            
- Pull Request Comment                  │ [38;5;35;1mowner/repo#123 (comment)[9][0m            
- Pull Request Comment                  │ [38;5;35;1mowner/repo#123 (comment)[10][0m           
- Pull Request Review                   │ [38;5;35;1mowner/repo#123 (review)[11][0m            
- Pull Request Review                   │ [38;5;35;1mowner/repo#123 (review)[12][0m            
- Discussion                            │ [38;5;35;1mowner/repo#123[13][0m                     
- Discussion Comment                    │ [38;5;35;1mowner/repo#123 (comment)[14][0m           
- Commit                                │ [38;5;35;1mowner/repo@abcdefg[15][0m                 
- Commit                                │ [38;5;35;1mowner/repo@abcdefg[16][0m                 
- Pull Request Commit                   │ [38;5;35;1mowner/repo@abcdefg[17][0m                 
- Pull Request Commit                   │ [38;5;35;1mowner/repo@abcdefg[18][0m                 
- Pull Request Commit                   │ [38;5;35;1mowner/repo@abcdefg[19][0m                 
- Pull Request Commit                   │ [38;5;35;1mowner/repo@abcdefg[20][0m                 
+ Issue                                 │ ​‌[38;5;35;1mowner/repo#123[1][0m‌​                      
+ Issue                                 │ ​‌[38;5;35;1mowner/repo#123[2][0m‌​                      
+ Issue Comment                         │ ​‌[38;5;35;1mowner/repo#123 (comment)[3][0m‌​            
+ Issue Comment                         │ ​‌[38;5;35;1mowner/repo#123 (comment)[4][0m‌​            
+ Pull Request                          │ ​‌[38;5;35;1mowner/repo#123[5][0m‌​                      
+ Pull Request                          │ ​‌[38;5;35;1mowner/repo#123[6][0m‌​                      
+ Pull Request Comment                  │ ​‌[38;5;35;1mowner/repo#123 (comment)[7][0m‌​            
+ Pull Request Comment                  │ ​‌[38;5;35;1mowner/repo#123 (comment)[8][0m‌​            
+ Pull Request Comment                  │ ​‌[38;5;35;1mowner/repo#123 (comment)[9][0m‌​            
+ Pull Request Comment                  │ ​‌[38;5;35;1mowner/repo#123 (comment)[10][0m‌​           
+ Pull Request Review                   │ ​‌[38;5;35;1mowner/repo#123 (review)[11][0m‌​            
+ Pull Request Review                   │ ​‌[38;5;35;1mowner/repo#123 (review)[12][0m‌​            
+ Discussion                            │ ​‌[38;5;35;1mowner/repo#123[13][0m‌​                     
+ Discussion Comment                    │ ​‌[38;5;35;1mowner/repo#123 (comment)[14][0m‌​           
+ Commit                                │ ​‌[38;5;35;1mowner/repo@abcdefg[15][0m‌​                 
+ Commit                                │ ​‌[38;5;35;1mowner/repo@abcdefg[16][0m‌​                 
+ Pull Request Commit                   │ ​‌[38;5;35;1mowner/repo@abcdefg[17][0m‌​                 
+ Pull Request Commit                   │ ​‌[38;5;35;1mowner/repo@abcdefg[18][0m‌​                 
+ Pull Request Commit                   │ ​‌[38;5;35;1mowner/repo@abcdefg[19][0m‌​                 
+ Pull Request Commit                   │ ​‌[38;5;35;1mowner/repo@abcdefg[20][0m‌​                 
                                                                                 
 [38;5;35;1m[0m[38;5;35;1m [1]: owner/repo#123[0m [38;5;30;4mhttps://github.com/owner/repo/issue/123[0m                    
 [38;5;35;1m[0m[38;5;35;1m [2]: owner/repo#123[0m [38;5;30;4mhttps://github.com/owner/repo/issues/123[0m                   
