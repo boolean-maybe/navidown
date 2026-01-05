@@ -131,7 +131,7 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 		if lineIdx == selectedLine {
 			hs, he = highlightStart, highlightEnd
 		}
-		v.drawLine(screen, x, y+row, width, line, hs, he)
+		v.drawLine(screen, x, y+row, width, line, hs, he, v.backgroundColor)
 	}
 }
 
@@ -162,7 +162,7 @@ func (v *Viewer) fireStateChanged() {
 	}
 }
 
-func (v *Viewer) drawLine(screen tcell.Screen, x, y, width int, line string, highlightStart, highlightEnd int) {
+func (v *Viewer) drawLine(screen tcell.Screen, x, y, width int, line string, highlightStart, highlightEnd int, fillBg tcell.Color) {
 	isHighlightLine := highlightStart >= 0 && highlightEnd > highlightStart
 
 	col := 0
@@ -177,14 +177,20 @@ func (v *Viewer) drawLine(screen tcell.Screen, x, y, width int, line string, hig
 			tagEnd := findTagEnd(runes, i)
 			if tagEnd > i {
 				tag := string(runes[i+1 : tagEnd])
-				fg, bg, bold := parseTag(tag, currentFg, currentBg, currentBold)
+				fg, bg, bold := parseTag(tag, currentFg, currentBg, currentBold, fillBg)
 				currentFg, currentBg, currentBold = fg, bg, bold
 				i = tagEnd + 1
 				continue
 			}
 		}
 
-		style := tcell.StyleDefault.Foreground(currentFg).Background(currentBg)
+		// Use fillBg when currentBg is ColorDefault and fillBg is set
+		bg := currentBg
+		if bg == tcell.ColorDefault && fillBg != tcell.ColorDefault {
+			bg = fillBg
+		}
+
+		style := tcell.StyleDefault.Foreground(currentFg).Background(bg)
 		if currentBold {
 			style = style.Bold(true)
 		}
@@ -210,7 +216,7 @@ func findTagEnd(runes []rune, start int) int {
 	return start
 }
 
-func parseTag(tag string, currentFg, currentBg tcell.Color, currentBold bool) (tcell.Color, tcell.Color, bool) {
+func parseTag(tag string, currentFg, currentBg tcell.Color, currentBold bool, fillBg tcell.Color) (tcell.Color, tcell.Color, bool) {
 	parts := strings.Split(tag, ":")
 	fg, bg, bold := currentFg, currentBg, currentBold
 
@@ -224,7 +230,12 @@ func parseTag(tag string, currentFg, currentBg tcell.Color, currentBold bool) (t
 
 	if len(parts) >= 2 {
 		if parts[1] == "-" {
-			bg = tcell.ColorDefault
+			// Reset to fillBg if set, otherwise ColorDefault
+			if fillBg != tcell.ColorDefault {
+				bg = fillBg
+			} else {
+				bg = tcell.ColorDefault
+			}
 		} else if parts[1] != "" {
 			bg = parseColor(parts[1], currentBg)
 		}
