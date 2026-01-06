@@ -30,6 +30,22 @@ func (v *Viewer) InputHandler() func(event *tcell.EventKey, setFocus func(p tvie
 		}
 
 		switch key {
+		case tcell.KeyLeft:
+			// Plain Left arrow = go back (fallback for terminals with broken Alt-key support)
+			if event.Modifiers() == 0 { // Only if no modifiers
+				if v.core.GoBack() {
+					v.refreshDisplayCache()
+					v.fireStateChanged()
+				}
+			}
+		case tcell.KeyRight:
+			// Plain Right arrow = go forward (fallback for terminals with broken Alt-key support)
+			if event.Modifiers() == 0 { // Only if no modifiers
+				if v.core.GoForward() {
+					v.refreshDisplayCache()
+					v.fireStateChanged()
+				}
+			}
 		case tcell.KeyUp:
 			if v.core.ScrollUp(height) {
 				v.fireStateChanged()

@@ -152,6 +152,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.viewer.GoForward() {
 				m.syncViewportContent()
 			}
+
+		// Plain arrow fallback for terminals with broken Alt-key support (Mac Terminal.app)
+		case "left":
+			if m.viewer.GoBack() {
+				m.syncViewportContent()
+			}
+
+		case "right":
+			if m.viewer.GoForward() {
+				m.syncViewportContent()
+			}
 		}
 	}
 
