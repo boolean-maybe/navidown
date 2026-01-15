@@ -1,0 +1,53 @@
+--- a/ansi/heading.go
++++ b/ansi/heading.go
+@@ -4,9 +4,26 @@ import (
+ 	"bytes"
+ 	"fmt"
+ 	"io"
++	"strings"
+
+ 	"github.com/muesli/reflow/wordwrap"
+ )
+
++// Marker constants for header position tracking
++// Level is encoded by repeating Word Joiner (U+2060)
++const (
++	headerMarkerPrefix = "\u200D" // ZWJ
++	headerLevelChar    = "\u2060" // Word Joiner
++	headerEndMarker    = "\u200D\u200C" // ZWJ + ZWNJ
++)
++
++// headerStartMarker generates a start marker for a heading with encoded level.
++func headerStartMarker(level int) string {
++	if level < 1 {
++		level = 1
++	}
++	if level > 6 {
++		level = 6
++	}
++	return headerMarkerPrefix + strings.Repeat(headerLevelChar, level) + headerMarkerPrefix
++}
++
+ // A HeadingElement is used to render headings.
+ type HeadingElement struct {
+ 	Level int
+@@ -53,6 +70,9 @@ func (e *HeadingElement) Render(w io.Writer, ctx RenderContext) error {
+
+ 	renderText(w, ctx.options.ColorProfile, bs.Parent().Style.StylePrimitive, rules.BlockPrefix)
+ 	renderText(bs.Current().Block, ctx.options.ColorProfile, bs.Current().Style.StylePrimitive, rules.Prefix)
++
++	// Inject start marker with encoded level for position tracking
++	io.WriteString(bs.Current().Block, headerStartMarker(e.Level))
+ 	return nil
+ }
+
+@@ -60,6 +80,9 @@ func (e *HeadingElement) Render(w io.Writer, ctx RenderContext) error {
+ func (e *HeadingElement) Finish(w io.Writer, ctx RenderContext) error {
+ 	bs := ctx.blockStack
+
++	// Inject end marker for position tracking (before word-wrap processing)
++	io.WriteString(bs.Current().Block, headerEndMarker)
++
+ 	rules := bs.Current().Style
+ 	mw := NewMarginWriter(ctx, w, rules)
+

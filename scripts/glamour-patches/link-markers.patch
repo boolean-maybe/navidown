@@ -1,0 +1,58 @@
+--- a/ansi/link.go
++++ b/ansi/link.go
+@@ -6,8 +6,15 @@ import (
+ 	"io"
+ 	"net/url"
+ )
+
++// Marker constants for link position tracking
++const (
++	linkStartMarker = "\u200B\u200C" // ZWS + ZWNJ
++	linkEndMarker   = "\u200C\u200B" // ZWNJ + ZWS
++)
++
+ // A LinkElement is used to render hyperlinks.
+ type LinkElement struct {
+ 	BaseURL  string
+ 	URL      string
+@@ -31,6 +38,9 @@ func (e *LinkElement) Render(w io.Writer, ctx RenderContext) error {
+ }
+
+ func (e *LinkElement) renderTextPart(w io.Writer, ctx RenderContext) error {
++	// Inject start marker for position tracking
++	io.WriteString(w, linkStartMarker)
++
+ 	for _, child := range e.Children {
+ 		if r, ok := child.(StyleOverriderElementRenderer); ok {
+ 			st := ctx.options.Styles.LinkText
+@@ -50,6 +60,9 @@ func (e *LinkElement) renderTextPart(w io.Writer, ctx RenderContext) error {
+ 		}
+ 	}
++
++	// Inject end marker for position tracking
++	io.WriteString(w, linkEndMarker)
+ 	return nil
+ }
+
+@@ -59,6 +72,10 @@ func (e *LinkElement) renderHrefPart(w io.Writer, ctx RenderContext) error {
+ 	}
+
+ 	u, err := url.Parse(e.URL)
+ 	if err == nil && "#"+u.Fragment != e.URL { // if the URL only consists of an anchor, ignore it
++		// For auto-links (SkipText=true), the href IS the clickable text, so inject markers here
++		if e.SkipText {
++			io.WriteString(w, linkStartMarker)
++		}
+ 		el := &BaseElement{
+ 			Token:  resolveRelativeURL(e.BaseURL, e.URL),
+ 			Prefix: prefix,
+@@ -67,6 +84,9 @@ func (e *LinkElement) renderHrefPart(w io.Writer, ctx RenderContext) error {
+ 		if err := el.Render(w, ctx); err != nil {
+ 			return err
+ 		}
++		if e.SkipText {
++			io.WriteString(w, linkEndMarker)
++		}
+ 	}
+ 	return nil
+ }
