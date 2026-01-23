@@ -11,9 +11,9 @@ import (
 	"github.com/rivo/tview"
 )
 
-// Viewer is a TView adapter for the core navidown markdown session.
+// boxViewer is a TView adapter for the core navidown markdown session.
 // it renders core ANSI output into tview primitives and supports link navigation + activation.
-type Viewer struct {
+type BoxViewer struct {
 	*tview.Box
 
 	core *nav.MarkdownSession
@@ -30,83 +30,83 @@ type Viewer struct {
 	// backgroundColor is the color used to fill empty space. ColorDefault means no fill.
 	backgroundColor tcell.Color
 
-	onSelect       func(*Viewer, nav.NavElement)
-	onStateChanged func(*Viewer)
+	onSelect       func(*BoxViewer, nav.NavElement)
+	onStateChanged func(*BoxViewer)
 }
 
-// New creates a new TView markdown viewer.
-func New() *Viewer {
+// newBox creates a new TView markdown viewer backed by a Box.
+func NewBox() *BoxViewer {
 	box := tview.NewBox()
 	box.SetBorder(false)
 
-	return &Viewer{
+	return &BoxViewer{
 		Box:             box,
 		core:            nav.New(nav.Options{}),
 		backgroundColor: tcell.ColorDefault,
 	}
 }
 
-// Core exposes the underlying UI-agnostic markdown session.
-func (v *Viewer) Core() *nav.MarkdownSession { return v.core }
+// core exposes the underlying UI-agnostic markdown session.
+func (v *BoxViewer) Core() *nav.MarkdownSession { return v.core }
 
-// SetAnsiConverter configures optional ANSI->tview conversion. If nil, tview.TranslateANSI is used.
-func (v *Viewer) SetAnsiConverter(c *util.AnsiConverter) {
+// setAnsiConverter configures optional ANSI->tview conversion. If nil, tview.TranslateANSI is used.
+func (v *BoxViewer) SetAnsiConverter(c *util.AnsiConverter) {
 	v.ansiConverter = c
 	v.refreshDisplayCache()
 }
 
-// SetBackgroundColor sets the background color for empty space.
-// Use tcell.ColorDefault to disable background filling (default behavior).
-func (v *Viewer) SetBackgroundColor(color tcell.Color) *Viewer {
+// setBackgroundColor sets the background color for empty space.
+// use tcell.ColorDefault to disable background filling (default behavior).
+func (v *BoxViewer) SetBackgroundColor(color tcell.Color) *BoxViewer {
 	v.backgroundColor = color
 	return v
 }
 
-// SetRenderer configures the renderer used by the core viewer.
-// This allows dynamic switching between light/dark styles.
-func (v *Viewer) SetRenderer(r nav.Renderer) *Viewer {
+// setRenderer configures the renderer used by the core viewer.
+// this allows dynamic switching between light/dark styles.
+func (v *BoxViewer) SetRenderer(r nav.Renderer) *BoxViewer {
 	v.core.SetRenderer(r)
 	v.refreshDisplayCache()
 	return v
 }
 
-// SetSelectHandler sets the callback for when Enter is pressed on a selected element.
-func (v *Viewer) SetSelectHandler(handler func(*Viewer, nav.NavElement)) *Viewer {
+// setSelectHandler sets the callback for when Enter is pressed on a selected element.
+func (v *BoxViewer) SetSelectHandler(handler func(*BoxViewer, nav.NavElement)) *BoxViewer {
 	v.onSelect = handler
 	return v
 }
 
-// SetStateChangedHandler sets a callback for when navigation state changes (selection/scroll/history).
-func (v *Viewer) SetStateChangedHandler(handler func(*Viewer)) *Viewer {
+// setStateChangedHandler sets a callback for when navigation state changes (selection/scroll/history).
+func (v *BoxViewer) SetStateChangedHandler(handler func(*BoxViewer)) *BoxViewer {
 	v.onStateChanged = handler
 	return v
 }
 
-// SetMarkdown sets markdown content to display.
-func (v *Viewer) SetMarkdown(content string) *Viewer {
+// setMarkdown sets markdown content to display.
+func (v *BoxViewer) SetMarkdown(content string) *BoxViewer {
 	_ = v.core.SetMarkdown(content)
 	v.refreshDisplayCache()
 	v.fireStateChanged()
 	return v
 }
 
-// SetMarkdownWithSource sets markdown content with source file context.
-func (v *Viewer) SetMarkdownWithSource(content string, sourceFilePath string, pushToHistory bool) *Viewer {
+// setMarkdownWithSource sets markdown content with source file context.
+func (v *BoxViewer) SetMarkdownWithSource(content string, sourceFilePath string, pushToHistory bool) *BoxViewer {
 	_ = v.core.SetMarkdownWithSource(content, sourceFilePath, pushToHistory)
 	v.refreshDisplayCache()
 	v.fireStateChanged()
 	return v
 }
 
-// Draw renders the component.
-func (v *Viewer) Draw(screen tcell.Screen) {
+// draw renders the component.
+func (v *BoxViewer) Draw(screen tcell.Screen) {
 	v.DrawForSubclass(screen, v)
 	x, y, width, height := v.GetInnerRect()
 	if width <= 0 || height <= 0 {
 		return
 	}
 
-	// Fill background if configured
+	// fill background if configured
 	if v.backgroundColor != tcell.ColorDefault {
 		bgStyle := tcell.StyleDefault.Background(v.backgroundColor)
 		for row := 0; row < height; row++ {
@@ -116,7 +116,7 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 		}
 	}
 
-	// Selected element info for highlighting.
+	// selected element info for highlighting.
 	selectedLine, highlightStart, highlightEnd := -1, -1, -1
 	if sel := v.core.Selected(); sel != nil {
 		selectedLine = sel.StartLine
@@ -139,7 +139,7 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 	}
 }
 
-func (v *Viewer) refreshDisplayCache() {
+func (v *BoxViewer) refreshDisplayCache() {
 	lines := v.core.RenderedLines()
 	if len(lines) == 0 {
 		v.displayLines = nil
@@ -147,7 +147,7 @@ func (v *Viewer) refreshDisplayCache() {
 		return
 	}
 
-	// Quick hash check - skip expensive conversion if content unchanged
+	// quick hash check - skip expensive conversion if content unchanged
 	newHash := hashLines(lines)
 	if newHash == v.lastContentHash && v.displayLines != nil {
 		return // Content unchanged, skip reprocessing
@@ -161,7 +161,7 @@ func (v *Viewer) refreshDisplayCache() {
 		converted = tview.TranslateANSI(joined)
 	}
 
-	// Strip invisible markers from display lines - they're only used for position calculation
+	// strip invisible markers from display lines - they're only used for position calculation
 	converted = nav.StripMarkers(converted)
 
 	v.displayLines = strings.Split(converted, "\n")
@@ -177,13 +177,13 @@ func hashLines(lines []string) uint64 {
 	return h.Sum64()
 }
 
-func (v *Viewer) fireStateChanged() {
+func (v *BoxViewer) fireStateChanged() {
 	if v.onStateChanged != nil {
 		v.onStateChanged(v)
 	}
 }
 
-func (v *Viewer) drawLine(screen tcell.Screen, x, y, width int, line string, highlightStart, highlightEnd int, fillBg tcell.Color) {
+func (v *BoxViewer) drawLine(screen tcell.Screen, x, y, width int, line string, highlightStart, highlightEnd int, fillBg tcell.Color) {
 	isHighlightLine := highlightStart >= 0 && highlightEnd > highlightStart
 
 	col := 0
@@ -193,7 +193,7 @@ func (v *Viewer) drawLine(screen tcell.Screen, x, y, width int, line string, hig
 
 	runes := []rune(line)
 	for i := 0; i < len(runes) && col < width; {
-		// Parse tview tag.
+		// parse tview tag.
 		if runes[i] == '[' {
 			tagEnd := findTagEnd(runes, i)
 			if tagEnd > i {
@@ -205,7 +205,7 @@ func (v *Viewer) drawLine(screen tcell.Screen, x, y, width int, line string, hig
 			}
 		}
 
-		// Use fillBg when currentBg is ColorDefault and fillBg is set
+		// use fillBg when currentBg is ColorDefault and fillBg is set
 		bg := currentBg
 		if bg == tcell.ColorDefault && fillBg != tcell.ColorDefault {
 			bg = fillBg
@@ -251,7 +251,7 @@ func parseTag(tag string, currentFg, currentBg tcell.Color, currentBold bool, fi
 
 	if len(parts) >= 2 {
 		if parts[1] == "-" {
-			// Reset to fillBg if set, otherwise ColorDefault
+			// reset to fillBg if set, otherwise ColorDefault
 			if fillBg != tcell.ColorDefault {
 				bg = fillBg
 			} else {

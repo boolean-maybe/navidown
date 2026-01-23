@@ -34,6 +34,8 @@ go get github.com/boolean-maybe/navidown/loaders
 
 ### Using the TView Adapter
 
+Two adapters are available: `BoxViewer` (custom draw) and `TextViewViewer` (TextView paging). This example uses `TextViewViewer`.
+
 ```go
 package main
 
@@ -46,7 +48,7 @@ import (
 
 func main() {
 	app := tview.NewApplication()
-	viewer := navtview.New()
+	viewer := navtview.NewTextView()
 
 	// Set initial markdown content
 	viewer.SetMarkdown(`# Welcome to navidown
@@ -65,7 +67,7 @@ Press **Enter** to follow links.
 
 	// Handle link activation
 	fetcher := nav.NewContentFetcher(&loaders.FileHTTP{}, nil)
-	viewer.SetSelectHandler(func(v *navtview.Viewer, elem nav.NavElement) {
+	viewer.SetSelectHandler(func(v *navtview.TextViewViewer, elem nav.NavElement) {
 		content, err := fetcher.FetchContent(elem)
 		if err == nil {
 			v.SetMarkdownWithSource(content, elem.URL, true)

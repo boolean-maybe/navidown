@@ -6,14 +6,14 @@ import (
 	"github.com/rivo/tview"
 )
 
-// InputHandler returns the input handler for this component.
-func (v *Viewer) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+// inputHandler returns the input handler for this component.
+func (v *BoxViewer) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
 	return v.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
 		key := event.Key()
 
 		_, _, _, height := v.GetInnerRect()
 
-		// Alt+Left / Alt+Right history navigation.
+		// alt+Left / alt+Right history navigation.
 		if key == tcell.KeyLeft && event.Modifiers()&tcell.ModAlt != 0 {
 			if v.core.GoBack() {
 				v.refreshDisplayCache()
@@ -31,7 +31,7 @@ func (v *Viewer) InputHandler() func(event *tcell.EventKey, setFocus func(p tvie
 
 		switch key {
 		case tcell.KeyLeft:
-			// Plain Left arrow = go back (fallback for terminals with broken Alt-key support)
+			// plain Left arrow = go back (fallback for terminals with broken Alt-key support)
 			if event.Modifiers() == 0 { // Only if no modifiers
 				if v.core.GoBack() {
 					v.refreshDisplayCache()
@@ -39,7 +39,7 @@ func (v *Viewer) InputHandler() func(event *tcell.EventKey, setFocus func(p tvie
 				}
 			}
 		case tcell.KeyRight:
-			// Plain Right arrow = go forward (fallback for terminals with broken Alt-key support)
+			// plain Right arrow = go forward (fallback for terminals with broken Alt-key support)
 			if event.Modifiers() == 0 { // Only if no modifiers
 				if v.core.GoForward() {
 					v.refreshDisplayCache()
@@ -79,7 +79,7 @@ func (v *Viewer) InputHandler() func(event *tcell.EventKey, setFocus func(p tvie
 		case tcell.KeyEnter:
 			if v.onSelect != nil {
 				if sel := v.core.Selected(); sel != nil {
-					// Ensure we pass a stable copy to callback.
+					// ensure we pass a stable copy to callback.
 					v.onSelect(v, *sel)
 					return
 				}
@@ -88,7 +88,7 @@ func (v *Viewer) InputHandler() func(event *tcell.EventKey, setFocus func(p tvie
 	})
 }
 
-// SetCorrelator delegates to the core viewer.
-func (v *Viewer) SetCorrelator(c nav.PositionCorrelator) {
+// setCorrelator delegates to the core viewer.
+func (v *BoxViewer) SetCorrelator(c nav.PositionCorrelator) {
 	v.core.SetCorrelator(c)
 }
