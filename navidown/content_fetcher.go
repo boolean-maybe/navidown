@@ -38,7 +38,7 @@ func NewContentFetcher(provider ContentProvider, searchRoots []string) *ContentF
 // OnSelect loads linked markdown and replaces current content, pushing history when navigating.
 // Returns an error if the operation fails. Use OnSelectWithErrorDisplay for backward-compatible
 // behavior that shows errors in the viewer.
-func (cf *ContentFetcher) OnSelect(viewer *Viewer, elem NavElement) error {
+func (cf *ContentFetcher) OnSelect(viewer *MarkdownSession, elem NavElement) error {
 	if viewer == nil {
 		return ErrNilViewer
 	}
@@ -68,7 +68,7 @@ func (cf *ContentFetcher) OnSelect(viewer *Viewer, elem NavElement) error {
 
 // OnSelectWithErrorDisplay loads content, showing errors in the viewer.
 // This provides backward-compatible behavior for callers that don't handle errors explicitly.
-func (cf *ContentFetcher) OnSelectWithErrorDisplay(viewer *Viewer, elem NavElement) {
+func (cf *ContentFetcher) OnSelectWithErrorDisplay(viewer *MarkdownSession, elem NavElement) {
 	if err := cf.OnSelect(viewer, elem); err != nil && !errors.Is(err, ErrNotLink) {
 		errorContent := "# Error\n\nFailed to load `" + elem.URL + "`:\n\n```\n" + err.Error() + "\n```"
 		_ = viewer.SetMarkdownWithSource(errorContent, elem.SourceFilePath, true)

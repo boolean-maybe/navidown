@@ -56,7 +56,10 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 
 	// Heading
 	case ast.KindHeading:
-		n := node.(*ast.Heading)
+		n, ok := node.(*ast.Heading)
+		if !ok {
+			return Element{}
+		}
 		he := &HeadingElement{
 			Level: n.Level,
 			First: node.PreviousSibling() == nil,
@@ -133,10 +136,14 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 			l++
 			n = n.PreviousSibling()
 		}
-		if node.Parent().(*ast.List).IsOrdered() {
+		list, ok := node.Parent().(*ast.List)
+		if !ok {
+			return Element{}
+		}
+		if list.IsOrdered() {
 			e = l
-			if node.Parent().(*ast.List).Start != 1 {
-				e += uint(node.Parent().(*ast.List).Start) - 1 //nolint: gosec
+			if list.Start != 1 {
+				e += uint(list.Start) - 1 //nolint: gosec
 			}
 		}
 
@@ -149,7 +156,10 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 		if node.FirstChild() != nil &&
 			node.FirstChild().FirstChild() != nil &&
 			node.FirstChild().FirstChild().Kind() == astext.KindTaskCheckBox {
-			nc := node.FirstChild().FirstChild().(*astext.TaskCheckBox)
+			nc, ok := node.FirstChild().FirstChild().(*astext.TaskCheckBox)
+			if !ok {
+				return Element{}
+			}
 
 			return Element{
 				Exiting: post,
@@ -162,14 +172,17 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 		return Element{
 			Exiting: post,
 			Renderer: &ItemElement{
-				IsOrdered:   node.Parent().(*ast.List).IsOrdered(),
+				IsOrdered:   list.IsOrdered(),
 				Enumeration: e,
 			},
 		}
 
 	// Text Elements
 	case ast.KindText:
-		n := node.(*ast.Text)
+		n, ok := node.(*ast.Text)
+		if !ok {
+			return Element{}
+		}
 		s := string(n.Segment.Value(source))
 
 		if n.HardLineBreak() || (n.SoftLineBreak()) {
@@ -183,7 +196,10 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 		}
 
 	case ast.KindEmphasis:
-		n := node.(*ast.Emphasis)
+		n, ok := node.(*ast.Emphasis)
+		if !ok {
+			return Element{}
+		}
 		var children []ElementRenderer
 		nn := n.FirstChild()
 		for nn != nil {
@@ -198,7 +214,10 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 		}
 
 	case astext.KindStrikethrough:
-		n := node.(*astext.Strikethrough)
+		n, ok := node.(*astext.Strikethrough)
+		if !ok {
+			return Element{}
+		}
 		s := string(n.Text(source)) //nolint: staticcheck
 		style := ctx.options.Styles.Strikethrough
 
@@ -220,7 +239,10 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 
 	// Links
 	case ast.KindLink:
-		n := node.(*ast.Link)
+		n, ok := node.(*ast.Link)
+		if !ok {
+			return Element{}
+		}
 		isFooterLinks := !ctx.options.InlineTableLinks && isInsideTable(node)
 
 		var children []ElementRenderer
@@ -253,7 +275,10 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 			},
 		}
 	case ast.KindAutoLink:
-		n := node.(*ast.AutoLink)
+		n, ok := node.(*ast.AutoLink)
+		if !ok {
+			return Element{}
+		}
 		u := string(n.URL(source))
 		isFooterLinks := !ctx.options.InlineTableLinks && isInsideTable(node)
 
@@ -301,7 +326,10 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 
 	// Images
 	case ast.KindImage:
-		n := node.(*ast.Image)
+		n, ok := node.(*ast.Image)
+		if !ok {
+			return Element{}
+		}
 		text := string(n.Text(source)) //nolint: staticcheck
 		isFooterLinks := !ctx.options.InlineTableLinks && isInsideTable(node)
 
@@ -329,7 +357,10 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 
 	// Code
 	case ast.KindFencedCodeBlock:
-		n := node.(*ast.FencedCodeBlock)
+		n, ok := node.(*ast.FencedCodeBlock)
+		if !ok {
+			return Element{}
+		}
 		l := n.Lines().Len()
 		s := ""
 		for i := 0; i < l; i++ {
@@ -345,7 +376,10 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 		}
 
 	case ast.KindCodeBlock:
-		n := node.(*ast.CodeBlock)
+		n, ok := node.(*ast.CodeBlock)
+		if !ok {
+			return Element{}
+		}
 		l := n.Lines().Len()
 		s := ""
 		for i := 0; i < l; i++ {
@@ -360,7 +394,10 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 		}
 
 	case ast.KindCodeSpan:
-		n := node.(*ast.CodeSpan)
+		n, ok := node.(*ast.CodeSpan)
+		if !ok {
+			return Element{}
+		}
 		s := string(n.Text(source)) //nolint: staticcheck
 		return Element{
 			Renderer: &CodeSpanElement{
@@ -371,7 +408,10 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 
 	// Tables
 	case astext.KindTable:
-		table := node.(*astext.Table)
+		table, ok := node.(*astext.Table)
+		if !ok {
+			return Element{}
+		}
 		te := &TableElement{
 			table:  table,
 			source: source,
@@ -384,7 +424,10 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 		}
 
 	case astext.KindTableCell:
-		n := node.(*astext.TableCell)
+		n, ok := node.(*astext.TableCell)
+		if !ok {
+			return Element{}
+		}
 		var children []ElementRenderer
 		nn := n.FirstChild()
 		for nn != nil {
@@ -411,7 +454,10 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 
 	// HTML Elements
 	case ast.KindHTMLBlock:
-		n := node.(*ast.HTMLBlock)
+		n, ok := node.(*ast.HTMLBlock)
+		if !ok {
+			return Element{}
+		}
 		return Element{
 			Renderer: &BaseElement{
 				Token: ctx.SanitizeHTML(string(n.Text(source)), true), //nolint: staticcheck
@@ -419,7 +465,10 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 			},
 		}
 	case ast.KindRawHTML:
-		n := node.(*ast.RawHTML)
+		n, ok := node.(*ast.RawHTML)
+		if !ok {
+			return Element{}
+		}
 		return Element{
 			Renderer: &BaseElement{
 				Token: ctx.SanitizeHTML(string(n.Text(source)), true), //nolint: staticcheck
@@ -464,7 +513,10 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 		return Element{}
 
 	case east.KindEmoji:
-		n := node.(*east.Emoji)
+		n, ok := node.(*east.Emoji)
+		if !ok {
+			return Element{}
+		}
 		return Element{
 			Renderer: &BaseElement{
 				Token: string(n.Value.Unicode),

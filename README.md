@@ -64,7 +64,7 @@ Press **Enter** to follow links.
 `)
 
 	// Handle link activation
-	fetcher := nav.NewContentFetcher(&loaders.FileHTTP{})
+	fetcher := nav.NewContentFetcher(&loaders.FileHTTP{}, nil)
 	viewer.SetSelectHandler(func(v *navtview.Viewer, elem nav.NavElement) {
 		content, err := fetcher.FetchContent(elem)
 		if err == nil {
@@ -89,10 +89,10 @@ import (
 )
 
 func main() {
-	viewer := navidown.New(navidown.Options{})
+	session := navidown.New(navidown.Options{})
 
 	// Set markdown content
-	_ = viewer.SetMarkdown(`# Hello World
+	_ = session.SetMarkdown(`# Hello World
 
 This is a [link](https://example.com).
 
@@ -100,14 +100,14 @@ This is a [link](https://example.com).
 More content here.`)
 
 	// Get rendered ANSI lines
-	lines := viewer.RenderedLines()
+	lines := session.RenderedLines()
 	for _, line := range lines {
 		fmt.Println(line)
 	}
 
 	// Navigate through links
-	viewer.MoveToNextLink(20)
-	if selected := viewer.Selected(); selected != nil {
+	session.MoveToNextLink(20)
+	if selected := session.Selected(); selected != nil {
 		fmt.Printf("Selected: %s -> %s\n", selected.Text, selected.URL)
 	}
 }

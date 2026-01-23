@@ -11,12 +11,12 @@ import (
 	"github.com/rivo/tview"
 )
 
-// Viewer is a TView adapter for the core navidown viewer.
-// It renders core ANSI output into tview primitives and supports link navigation + activation.
+// Viewer is a TView adapter for the core navidown markdown session.
+// it renders core ANSI output into tview primitives and supports link navigation + activation.
 type Viewer struct {
 	*tview.Box
 
-	core *nav.Viewer
+	core *nav.MarkdownSession
 
 	// displayLines are core rendered lines converted to tview-tagged strings (optional).
 	displayLines []string
@@ -46,8 +46,8 @@ func New() *Viewer {
 	}
 }
 
-// Core exposes the underlying UI-agnostic viewer.
-func (v *Viewer) Core() *nav.Viewer { return v.core }
+// Core exposes the underlying UI-agnostic markdown session.
+func (v *Viewer) Core() *nav.MarkdownSession { return v.core }
 
 // SetAnsiConverter configures optional ANSI->tview conversion. If nil, tview.TranslateANSI is used.
 func (v *Viewer) SetAnsiConverter(c *util.AnsiConverter) {
@@ -100,7 +100,7 @@ func (v *Viewer) SetMarkdownWithSource(content string, sourceFilePath string, pu
 
 // Draw renders the component.
 func (v *Viewer) Draw(screen tcell.Screen) {
-	v.Box.DrawForSubclass(screen, v)
+	v.DrawForSubclass(screen, v)
 	x, y, width, height := v.GetInnerRect()
 	if width <= 0 || height <= 0 {
 		return
@@ -279,17 +279,20 @@ func parseColor(s string, fallback tcell.Color) tcell.Color {
 		g, okG := parseHexByte(s[3:5])
 		b, okB := parseHexByte(s[5:7])
 		if okR && okG && okB {
-			return tcell.NewRGBColor(int32(r), int32(g), int32(b))
+			return tcell.NewRGBColor(r, g, b)
 		}
 		return fallback
 	}
 	return tcell.GetColor(s)
 }
 
-func parseHexByte(s string) (int64, bool) {
+func parseHexByte(s string) (int32, bool) {
 	v, err := strconv.ParseInt(s, 16, 32)
 	if err != nil {
 		return 0, false
 	}
-	return v, true
+	if v < 0 || v > 255 {
+		return 0, false
+	}
+	return int32(v), true
 }

@@ -102,10 +102,10 @@ func TestResolveMarkdownPath_SearchRoots(t *testing.T) {
 	tmpDir := t.TempDir()
 	rootA := filepath.Join(tmpDir, "rootA")
 	rootB := filepath.Join(tmpDir, "rootB")
-	if err := os.MkdirAll(rootA, 0o755); err != nil {
+	if err := os.MkdirAll(rootA, 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(rootB, 0o755); err != nil {
+	if err := os.MkdirAll(rootB, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
@@ -144,9 +144,9 @@ func TestResolveMarkdownPath_EmptyURL(t *testing.T) {
 
 func TestContainsDirectoryTraversal_AbsoluteSensitivePaths(t *testing.T) {
 	tests := []struct {
-		name       string
-		path       string
-		want       bool
+		name          string
+		path          string
+		want          bool
 		skipOnWindows bool
 	}{
 		{name: "Sensitive /etc path", path: "/etc/passwd", want: true},

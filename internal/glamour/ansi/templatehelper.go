@@ -13,8 +13,17 @@ import (
 var (
 	TemplateFuncMap = template.FuncMap{
 		"Left": func(values ...interface{}) string {
-			s := values[0].(string)
-			n := values[1].(int)
+			if len(values) < 2 { //nolint:mnd
+				return ""
+			}
+			s, ok := values[0].(string)
+			if !ok {
+				return ""
+			}
+			n, ok := values[1].(int)
+			if !ok {
+				return ""
+			}
 			if n > len(s) {
 				n = len(s)
 			}
@@ -22,18 +31,41 @@ var (
 			return s[:n]
 		},
 		"Matches": func(values ...interface{}) bool {
-			ok, _ := regexp.MatchString(values[1].(string), values[0].(string))
-			return ok
+			if len(values) < 2 { //nolint:mnd
+				return false
+			}
+			s, ok := values[0].(string)
+			if !ok {
+				return false
+			}
+			pattern, ok := values[1].(string)
+			if !ok {
+				return false
+			}
+			matched, err := regexp.MatchString(pattern, s)
+			return err == nil && matched
 		},
 		"Mid": func(values ...interface{}) string {
-			s := values[0].(string)
-			l := values[1].(int)
+			if len(values) < 2 { //nolint:mnd
+				return ""
+			}
+			s, ok := values[0].(string)
+			if !ok {
+				return ""
+			}
+			l, ok := values[1].(int)
+			if !ok {
+				return ""
+			}
 			if l > len(s) {
 				l = len(s)
 			}
 
 			if len(values) > 2 { //nolint:mnd
-				r := values[2].(int)
+				r, ok := values[2].(int)
+				if !ok {
+					return ""
+				}
 				if r > len(s) {
 					r = len(s)
 				}
@@ -42,8 +74,18 @@ var (
 			return s[l:]
 		},
 		"Right": func(values ...interface{}) string {
-			s := values[0].(string)
-			n := len(s) - values[1].(int)
+			if len(values) < 2 { //nolint:mnd
+				return ""
+			}
+			s, ok := values[0].(string)
+			if !ok {
+				return ""
+			}
+			n, ok := values[1].(int)
+			if !ok {
+				return ""
+			}
+			n = len(s) - n
 			if n < 0 {
 				n = 0
 			}
@@ -51,7 +93,14 @@ var (
 			return s[n:]
 		},
 		"Last": func(values ...interface{}) string {
-			return values[0].([]string)[len(values[0].([]string))-1]
+			if len(values) < 1 {
+				return ""
+			}
+			parts, ok := values[0].([]string)
+			if !ok || len(parts) == 0 {
+				return ""
+			}
+			return parts[len(parts)-1]
 		},
 		// strings functions
 		"Compare":      strings.Compare, // 1.5+ only

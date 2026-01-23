@@ -36,7 +36,7 @@ func (f *FileHTTP) FetchContent(elem navidown.NavElement) (string, error) {
 	return f.fetchFromLocal(resolvedPath)
 }
 
-func (f *FileHTTP) fetchFromWeb(url string) (string, error) {
+func (f *FileHTTP) fetchFromWeb(url string) (content string, err error) {
 	client := f.Client
 	if client == nil {
 		client = http.DefaultClient
@@ -46,7 +46,11 @@ func (f *FileHTTP) fetchFromWeb(url string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch URL: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close response body: %w", closeErr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("server returned non-200 status: %d", resp.StatusCode)

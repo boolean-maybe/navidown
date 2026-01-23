@@ -61,13 +61,22 @@ func TestDetectStyleFromEnvironment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Cleanup(func() {
+				if err := os.Unsetenv("COLORFGBG"); err != nil {
+					t.Fatalf("unset COLORFGBG: %v", err)
+				}
+			})
+
 			// Set environment variable
 			if tt.colorfgbg == "" {
-				os.Unsetenv("COLORFGBG")
+				if err := os.Unsetenv("COLORFGBG"); err != nil {
+					t.Fatalf("unset COLORFGBG: %v", err)
+				}
 			} else {
-				os.Setenv("COLORFGBG", tt.colorfgbg)
+				if err := os.Setenv("COLORFGBG", tt.colorfgbg); err != nil {
+					t.Fatalf("set COLORFGBG: %v", err)
+				}
 			}
-			defer os.Unsetenv("COLORFGBG")
 
 			style := detectStyleFromEnvironment()
 
