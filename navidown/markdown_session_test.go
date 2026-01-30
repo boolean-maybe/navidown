@@ -412,3 +412,282 @@ func TestViewer_ParsesAutoLink(t *testing.T) {
 		t.Fatal("expected autolink element to be parsed")
 	}
 }
+
+func TestGenerateSlug(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"Hello World", "hello-world"},
+		{"What's New?", "whats-new"},
+		{"Version 2.0", "version-20"},
+		{"  Spaces  ", "spaces"},
+		{"UPPERCASE", "uppercase"},
+		{"multiple---hyphens", "multiple-hyphens"},
+		{"under_scores_work", "under-scores-work"},
+		{"", ""},
+		{"123", "123"},
+		{"a", "a"},
+		{"Special!@#$%Characters", "specialcharacters"},
+		{"  leading and trailing  ", "leading-and-trailing"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := generateSlug(tt.input)
+			if got != tt.expected {
+				t.Errorf("generateSlug(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNavElement_IsInternalLink(t *testing.T) {
+	tests := []struct {
+		name     string
+		elem     NavElement
+		expected bool
+	}{
+		{"internal link", NavElement{Type: NavElementURL, URL: "#section"}, true},
+		{"external link", NavElement{Type: NavElementURL, URL: "https://example.com"}, false},
+		{"local file", NavElement{Type: NavElementURL, URL: "other.md"}, false},
+		{"empty URL", NavElement{Type: NavElementURL, URL: ""}, false},
+		{"header element", NavElement{Type: NavElementHeader, URL: ""}, false},
+		{"hash only", NavElement{Type: NavElementURL, URL: "#"}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.elem.IsInternalLink()
+			if got != tt.expected {
+				t.Errorf("IsInternalLink() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNavElement_AnchorTarget(t *testing.T) {
+	tests := []struct {
+		name     string
+		elem     NavElement
+		expected string
+	}{
+		{"internal link", NavElement{Type: NavElementURL, URL: "#section"}, "section"},
+		{"external link", NavElement{Type: NavElementURL, URL: "https://example.com"}, ""},
+		{"hash only", NavElement{Type: NavElementURL, URL: "#"}, ""},
+		{"complex anchor", NavElement{Type: NavElementURL, URL: "#my-header-123"}, "my-header-123"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.elem.AnchorTarget()
+			if got != tt.expected {
+				t.Errorf("AnchorTarget() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestViewer_FindHeaderBySlug(t *testing.T) {
+	v := New(Options{Renderer: staticRenderer{lines: []string{"# First", "## Second", "content"}}})
+	_ = v.SetMarkdown("# First\n## Second\nSome content")
+
+	// should find existing header
+	header := v.FindHeaderBySlug("first")
+	if header == nil {
+		t.Fatal("expected to find header 'first'")
+	}
+	if header.Text != "First" {
+		t.Errorf("expected Text='First', got %q", header.Text)
+	}
+
+	header = v.FindHeaderBySlug("second")
+	if header == nil {
+		t.Fatal("expected to find header 'second'")
+	}
+
+	// should return nil for non-existent
+	header = v.FindHeaderBySlug("nonexistent")
+	if header != nil {
+		t.Errorf("expected nil for nonexistent slug, got %#v", header)
+	}
+}
+
+func TestViewer_ScrollToAnchor(t *testing.T) {
+	v := New(Options{Renderer: staticRenderer{lines: []string{
+		"# First",
+		"content",
+		"more content",
+		"## Second",
+		"even more",
+	}}})
+	_ = v.SetMarkdown("# First\ncontent\nmore content\n## Second\neven more")
+
+	// manually set element positions for test
+	v.elements[0].StartLine = 0
+	v.elements[1].StartLine = 3
+
+	// scroll to second header
+	viewportHeight := 3
+	totalLines := len(v.RenderedLines())
+	maxOffset := totalLines - viewportHeight
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+
+	if !v.ScrollToAnchor("second", viewportHeight, false) {
+		t.Fatal("expected ScrollToAnchor to succeed")
+	}
+	// header is at line 3, but should be clamped to maxOffset
+	if v.ScrollOffset() > maxOffset {
+		t.Errorf("scrollOffset %d exceeds maxOffset %d", v.ScrollOffset(), maxOffset)
+	}
+	if v.ScrollOffset() < 0 {
+		t.Errorf("scrollOffset %d is negative", v.ScrollOffset())
+	}
+
+	// scroll to first header (at line 0)
+	if !v.ScrollToAnchor("first", viewportHeight, false) {
+		t.Fatal("expected ScrollToAnchor to succeed")
+	}
+	if v.ScrollOffset() != 0 {
+		t.Errorf("expected scrollOffset=0, got %d", v.ScrollOffset())
+	}
+
+	// non-existent should fail
+	if v.ScrollToAnchor("nonexistent", viewportHeight, false) {
+		t.Error("expected ScrollToAnchor to fail for nonexistent slug")
+	}
+}
+
+func TestViewer_ScrollToAnchor_PushesToHistory(t *testing.T) {
+	v := New(Options{Renderer: staticRenderer{lines: []string{
+		"# First",
+		"content",
+		"## Second",
+		"more",
+	}}})
+	_ = v.SetMarkdown("# First\ncontent\n## Second\nmore")
+
+	v.elements[0].StartLine = 0
+	v.elements[1].StartLine = 2
+
+	// initial state
+	if v.CanGoBack() {
+		t.Fatal("expected no back history initially")
+	}
+
+	// scroll with pushToHistory=true
+	if !v.ScrollToAnchor("second", 4, true) {
+		t.Fatal("expected ScrollToAnchor to succeed")
+	}
+
+	if !v.CanGoBack() {
+		t.Fatal("expected back history after ScrollToAnchor with pushToHistory=true")
+	}
+
+	// go back should restore previous position
+	if !v.GoBack() {
+		t.Fatal("expected GoBack to succeed")
+	}
+	if v.ScrollOffset() != 0 {
+		t.Errorf("expected scrollOffset=0 after GoBack, got %d", v.ScrollOffset())
+	}
+}
+
+func TestViewer_InternalLinkHistory(t *testing.T) {
+	v := New(Options{Renderer: staticRenderer{lines: []string{
+		"# Intro",
+		"[Jump to Details](#details)",
+		"## Details",
+		"Some details here",
+		"[Back to Intro](#intro)",
+	}}})
+	_ = v.SetMarkdown("# Intro\n[Jump to Details](#details)\n## Details\nSome details here\n[Back to Intro](#intro)")
+
+	// set positions manually
+	for i := range v.elements {
+		if v.elements[i].Type == NavElementHeader && v.elements[i].Slug == "intro" {
+			v.elements[i].StartLine = 0
+		}
+		if v.elements[i].Type == NavElementHeader && v.elements[i].Slug == "details" {
+			v.elements[i].StartLine = 2
+		}
+	}
+
+	// navigate to #details
+	v.ScrollToAnchor("details", 5, true)
+	if v.ScrollOffset() != 0 { // 5 lines, viewport 5 → maxOffset=0
+		t.Errorf("expected scrollOffset=0, got %d", v.ScrollOffset())
+	}
+
+	// go back
+	if !v.GoBack() {
+		t.Fatal("expected GoBack to succeed")
+	}
+
+	// go forward
+	if !v.GoForward() {
+		t.Fatal("expected GoForward to succeed")
+	}
+}
+
+func TestViewer_ParsesHeaderSlugs(t *testing.T) {
+	v := New(Options{Renderer: staticRenderer{lines: []string{"x"}}})
+	_ = v.SetMarkdown("# Hello World\n## What's New?\n### Version 2.0")
+
+	slugs := map[string]bool{}
+	for _, elem := range v.Elements() {
+		if elem.Type == NavElementHeader {
+			slugs[elem.Slug] = true
+		}
+	}
+
+	expected := []string{"hello-world", "whats-new", "version-20"}
+	for _, s := range expected {
+		if !slugs[s] {
+			t.Errorf("expected slug %q to be present", s)
+		}
+	}
+}
+
+func TestViewer_DuplicateHeaderSlugs(t *testing.T) {
+	v := New(Options{Renderer: staticRenderer{lines: []string{
+		"Example",
+		"First section",
+		"Example",
+		"Second section",
+		"Example",
+		"Third section",
+	}}})
+	_ = v.SetMarkdown(`## Example
+First section
+## Example
+Second section
+## Example
+Third section`)
+
+	elements := v.Elements()
+	if len(elements) != 3 {
+		t.Fatalf("expected 3 headers, got %d", len(elements))
+	}
+
+	expectedSlugs := []string{"example", "example-1", "example-2"}
+	for i, expected := range expectedSlugs {
+		if elements[i].Slug != expected {
+			t.Errorf("header %d: expected slug %q, got %q", i, expected, elements[i].Slug)
+		}
+	}
+
+	// Verify FindHeaderBySlug finds each one
+	for _, slug := range expectedSlugs {
+		found := v.FindHeaderBySlug(slug)
+		if found == nil {
+			t.Errorf("FindHeaderBySlug(%q) returned nil", slug)
+			continue
+		}
+		if found.Slug != slug {
+			t.Errorf("FindHeaderBySlug(%q) returned header with slug %q", slug, found.Slug)
+		}
+	}
+}

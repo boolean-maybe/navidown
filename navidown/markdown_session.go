@@ -3,11 +3,37 @@ package navidown
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
 )
+
+// generateSlug converts header text to a URL-safe anchor slug (GitHub-compatible).
+// Example: "Hello World" → "hello-world", "What's New?" → "whats-new"
+func generateSlug(text string) string {
+	var result strings.Builder
+	prevHyphen := true // start as true to avoid leading hyphen
+
+	for _, r := range text {
+		switch {
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			result.WriteRune(unicode.ToLower(r))
+			prevHyphen = false
+		case unicode.IsSpace(r) || r == '-' || r == '_':
+			if !prevHyphen {
+				result.WriteByte('-')
+				prevHyphen = true
+			}
+			// skip other characters (punctuation, etc.)
+		}
+	}
+
+	// trim trailing hyphen
+	s := result.String()
+	return strings.TrimSuffix(s, "-")
+}
 
 // MarkdownSession is a UI-agnostic navigable markdown state machine that serves as a model
 // for UI components, remembering original Markdown, rendered text, links and scrolling position
@@ -176,6 +202,8 @@ func (v *MarkdownSession) parseMarkdownWithSource(source []byte, sourceFilePath 
 	doc := md.Parser().Parse(reader)
 
 	var elements []NavElement
+	slugCounts := make(map[string]int)
+
 	_ = ast.Walk(doc, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
@@ -189,10 +217,21 @@ func (v *MarkdownSession) parseMarkdownWithSource(source []byte, sourceFilePath 
 					headingText.Write(textNode.Segment.Value(source))
 				}
 			}
+			text := headingText.String()
+			baseSlug := generateSlug(text)
+			count := slugCounts[baseSlug]
+			slugCounts[baseSlug]++
+
+			slug := baseSlug
+			if count > 0 {
+				slug = fmt.Sprintf("%s-%d", baseSlug, count)
+			}
+
 			elements = append(elements, NavElement{
 				Type:           NavElementHeader,
-				Text:           headingText.String(),
+				Text:           text,
 				Level:          n.Level,
+				Slug:           slug,
 				SourceFilePath: sourceFilePath,
 			})
 		case *ast.Link:
@@ -569,4 +608,43 @@ func (v *MarkdownSession) MoveToLast(viewportHeight int) bool {
 		}
 	}
 	return false
+}
+
+// FindHeaderBySlug returns the first header element matching the given slug, or nil if not found.
+func (v *MarkdownSession) FindHeaderBySlug(slug string) *NavElement {
+	for i := range v.elements {
+		if v.elements[i].Type == NavElementHeader && v.elements[i].Slug == slug {
+			elem := v.elements[i]
+			return &elem
+		}
+	}
+	return nil
+}
+
+// ScrollToAnchor scrolls to a header by its slug.
+// If pushToHistory is true, saves the current position to back history before scrolling.
+// Returns true if the header was found and scrolled to, false otherwise.
+func (v *MarkdownSession) ScrollToAnchor(slug string, viewportHeight int, pushToHistory bool) bool {
+	header := v.FindHeaderBySlug(slug)
+	if header == nil {
+		return false
+	}
+
+	if pushToHistory {
+		v.history.Push(v.saveCurrentState())
+	}
+
+	v.scrollOffset = header.StartLine
+	v.selectedIndex = -1
+
+	// clamp to valid range
+	maxOffset := len(v.renderedLines) - viewportHeight
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if v.scrollOffset > maxOffset {
+		v.scrollOffset = maxOffset
+	}
+
+	return true
 }

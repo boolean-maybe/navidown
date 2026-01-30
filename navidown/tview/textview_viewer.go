@@ -114,6 +114,17 @@ func (v *TextViewViewer) SetMarkdownWithSource(content string, sourceFilePath st
 	return v
 }
 
+// ScrollToAnchor scrolls to a header by slug and triggers UI redraw.
+func (v *TextViewViewer) ScrollToAnchor(slug string, pushToHistory bool) bool {
+	_, _, _, height := v.GetInnerRect()
+	if v.core.ScrollToAnchor(slug, height, pushToHistory) {
+		v.ScrollTo(v.core.ScrollOffset(), 0)
+		v.fireStateChanged()
+		return true
+	}
+	return false
+}
+
 func (v *TextViewViewer) refreshDisplayCache() {
 	lines := v.core.RenderedLines()
 	if len(lines) == 0 {
