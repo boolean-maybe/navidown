@@ -96,10 +96,12 @@ func detectStyleFromEnvironment() ansi.StyleConfig {
 	return styles.DarkStyleConfig
 }
 
-// WithWordWrap configures glamour word wrap (0 means no wrap).
+// WithWordWrap returns a new renderer with specified word wrap.
 func (r *ANSIStyleRenderer) WithWordWrap(cols int) *ANSIStyleRenderer {
-	r.wordWrap = cols
-	return r
+	return &ANSIStyleRenderer{
+		glamourStyle: r.glamourStyle,
+		wordWrap:     cols,
+	}
 }
 
 var ansiSGRPattern = regexp.MustCompile(`\x1b\[[0-9;]*m`)

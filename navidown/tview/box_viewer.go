@@ -32,6 +32,8 @@ type BoxViewer struct {
 
 	onSelect       func(*BoxViewer, nav.NavElement)
 	onStateChanged func(*BoxViewer)
+
+	lastKnownWidth int
 }
 
 // newBox creates a new TView markdown viewer backed by a Box.
@@ -84,14 +86,24 @@ func (v *BoxViewer) SetStateChangedHandler(handler func(*BoxViewer)) *BoxViewer 
 
 // setMarkdown sets markdown content to display.
 func (v *BoxViewer) SetMarkdown(content string) *BoxViewer {
+	v.ensureWidthConfigured()
 	_ = v.core.SetMarkdown(content)
 	v.refreshDisplayCache()
 	v.fireStateChanged()
 	return v
 }
 
+func (v *BoxViewer) ensureWidthConfigured() {
+	_, _, width, _ := v.GetInnerRect()
+	if width > 0 && v.core.CurrentWidth() != width {
+		v.lastKnownWidth = width
+		v.core.SetWidth(width)
+	}
+}
+
 // setMarkdownWithSource sets markdown content with source file context.
 func (v *BoxViewer) SetMarkdownWithSource(content string, sourceFilePath string, pushToHistory bool) *BoxViewer {
+	v.ensureWidthConfigured()
 	_ = v.core.SetMarkdownWithSource(content, sourceFilePath, pushToHistory)
 	v.refreshDisplayCache()
 	v.fireStateChanged()
@@ -104,6 +116,14 @@ func (v *BoxViewer) Draw(screen tcell.Screen) {
 	x, y, width, height := v.GetInnerRect()
 	if width <= 0 || height <= 0 {
 		return
+	}
+
+	// Check width change
+	if width != v.lastKnownWidth {
+		v.lastKnownWidth = width
+		if v.core.SetWidth(width) {
+			v.refreshDisplayCache()
+		}
 	}
 
 	// fill background if configured

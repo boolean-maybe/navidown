@@ -53,4 +53,5 @@ type PageState struct {
 	Elements       []NavElement
 	RenderedLines  []string
 	Cleaner        LineCleaner
+	Width          int // Rendering width at capture time
 }

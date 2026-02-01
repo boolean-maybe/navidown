@@ -64,6 +64,9 @@ type MarkdownSession struct {
 	// strategies
 	renderer   Renderer
 	correlator PositionCorrelator
+
+	// rendering
+	currentWidth int // 0 means no wrapping
 }
 
 // Options configures a markdownSession.
@@ -119,6 +122,9 @@ func (v *MarkdownSession) Markdown() string { return v.markdown }
 // SourceFilePath returns the current source file path context.
 func (v *MarkdownSession) SourceFilePath() string { return v.currentSourceFile }
 
+// CurrentWidth returns the current rendering width (0 means no wrapping).
+func (v *MarkdownSession) CurrentWidth() int { return v.currentWidth }
+
 // RenderedLines returns all rendered lines.
 func (v *MarkdownSession) RenderedLines() []string { return v.renderedLines }
 
@@ -159,6 +165,134 @@ func (v *MarkdownSession) SelectedIndex() int { return v.selectedIndex }
 // ScrollOffset returns the index of the first visible line.
 func (v *MarkdownSession) ScrollOffset() int { return v.scrollOffset }
 
+// SetWidth updates rendering width and re-renders if changed.
+// Returns true if content was re-rendered.
+func (v *MarkdownSession) SetWidth(cols int) bool {
+	if cols < 0 {
+		cols = 0
+	}
+	if v.currentWidth == cols {
+		return false
+	}
+	if v.markdown == "" {
+		v.currentWidth = cols
+		return false
+	}
+
+	// Save state
+	selectedElem := v.Selected()
+	var anchorElem *NavElement
+	if v.scrollOffset >= 0 && v.scrollOffset < len(v.renderedLines) {
+		anchorElem = v.findElementNearLine(v.scrollOffset)
+	}
+
+	oldWidth := v.currentWidth
+	v.currentWidth = cols
+
+	// Re-render with new width
+	if err := v.reRenderWithWidth(cols); err != nil {
+		v.currentWidth = oldWidth
+		return false
+	}
+
+	// Restore state
+	v.restoreScrollAndSelection(anchorElem, selectedElem)
+	return true
+}
+
+func (v *MarkdownSession) reRenderWithWidth(cols int) error {
+	rendered, err := v.rendererForWidth(cols).Render(v.markdown)
+	if err != nil {
+		return err
+	}
+
+	v.renderedLines = rendered.Lines
+	v.setCleaner(rendered.Cleaner)
+	v.correlatePositions()
+	return nil
+}
+
+func (v *MarkdownSession) rendererForWidth(cols int) Renderer {
+	if cols > 0 {
+		if ansiRenderer, ok := v.renderer.(*ANSIStyleRenderer); ok {
+			return ansiRenderer.WithWordWrap(cols)
+		}
+	}
+	return v.renderer
+}
+
+func (v *MarkdownSession) setCleaner(c LineCleaner) {
+	v.cleaner = c
+	if v.cleaner == nil {
+		v.cleaner = LineCleanerFunc(func(s string) string { return s })
+	}
+}
+
+func (v *MarkdownSession) findElementNearLine(lineIdx int) *NavElement {
+	if len(v.elements) == 0 {
+		return nil
+	}
+
+	// Find element closest to lineIdx.
+	// Note: O(n) scan; could use binary search since elements are sorted by StartLine,
+	// but element count is typically small enough that this doesn't matter.
+	bestIdx := -1
+	bestDist := -1
+	for i := range v.elements {
+		dist := v.elements[i].StartLine - lineIdx
+		if dist < 0 {
+			dist = -dist
+		}
+		if bestIdx == -1 || dist < bestDist {
+			bestIdx = i
+			bestDist = dist
+		}
+	}
+
+	if bestIdx >= 0 {
+		return &v.elements[bestIdx]
+	}
+	return nil
+}
+
+func (v *MarkdownSession) restoreScrollAndSelection(anchorElem, selectedElem *NavElement) {
+	if anchorElem != nil {
+		for i := range v.elements {
+			if v.elementsMatch(&v.elements[i], anchorElem) {
+				v.scrollOffset = v.elements[i].StartLine
+				break
+			}
+		}
+	}
+
+	if selectedElem != nil && selectedElem.Type == NavElementURL {
+		for i := range v.elements {
+			if v.elementsMatch(&v.elements[i], selectedElem) {
+				v.selectedIndex = i
+				return
+			}
+		}
+	}
+	// Clear selection if no link was selected, or if the previously selected link
+	// could not be found after re-render (e.g., content changed).
+	v.selectedIndex = -1
+
+	// Clamp scroll offset to valid range
+	if len(v.renderedLines) > 0 && v.scrollOffset >= len(v.renderedLines) {
+		v.scrollOffset = len(v.renderedLines) - 1
+	}
+}
+
+func (v *MarkdownSession) elementsMatch(e1, e2 *NavElement) bool {
+	if e1.Type != e2.Type {
+		return false
+	}
+	if e1.Type == NavElementHeader {
+		return e1.Slug == e2.Slug
+	}
+	return e1.URL == e2.URL && e1.Text == e2.Text
+}
+
 // SetMarkdown loads markdown. If pushToHistory is true, it stores the current page in back history first.
 func (v *MarkdownSession) SetMarkdown(content string) error {
 	return v.SetMarkdownWithSource(content, "", false)
@@ -169,7 +303,8 @@ func (v *MarkdownSession) SetMarkdown(content string) error {
 func (v *MarkdownSession) SetMarkdownWithSource(content string, sourceFilePath string, pushToHistory bool) error {
 	// Parse and render BEFORE mutating state to ensure atomicity
 	tmpElements := v.parseMarkdownWithSource([]byte(content), sourceFilePath)
-	rendered, err := v.renderer.Render(content)
+
+	rendered, err := v.rendererForWidth(v.currentWidth).Render(content)
 	if err != nil {
 		return err // Nothing mutated, viewer still valid
 	}
@@ -184,10 +319,7 @@ func (v *MarkdownSession) SetMarkdownWithSource(content string, sourceFilePath s
 	v.currentSourceFile = sourceFilePath
 	v.elements = tmpElements
 	v.renderedLines = rendered.Lines
-	v.cleaner = rendered.Cleaner
-	if v.cleaner == nil {
-		v.cleaner = LineCleanerFunc(func(s string) string { return s })
-	}
+	v.setCleaner(rendered.Cleaner)
 
 	v.correlatePositions()
 
@@ -343,6 +475,7 @@ func (v *MarkdownSession) saveCurrentState() PageState {
 		Elements:       elementsCopy,
 		RenderedLines:  linesCopy,
 		Cleaner:        v.cleaner,
+		Width:          v.currentWidth,
 	}
 }
 
@@ -350,15 +483,13 @@ func (v *MarkdownSession) restoreState(state PageState) {
 	v.markdown = state.Markdown
 	v.currentSourceFile = state.SourceFilePath
 	v.scrollOffset = state.ScrollOffset
+	v.currentWidth = state.Width
 
 	v.elements = make([]NavElement, len(state.Elements))
 	copy(v.elements, state.Elements)
 	v.renderedLines = make([]string, len(state.RenderedLines))
 	copy(v.renderedLines, state.RenderedLines)
-	v.cleaner = state.Cleaner
-	if v.cleaner == nil {
-		v.cleaner = LineCleanerFunc(func(s string) string { return s })
-	}
+	v.setCleaner(state.Cleaner)
 
 	v.selectedIndex = state.SelectedIndex
 	if v.selectedIndex < 0 || v.selectedIndex >= len(v.elements) {

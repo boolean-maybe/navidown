@@ -18,7 +18,7 @@ type selectionKey struct {
 	ok    bool
 }
 
-// textViewViewer is a TextView-based adapter for the core navidown markdown session.
+// TextViewViewer is a TextView-based adapter for the core navidown markdown session.
 // it preserves TextView paging while supporting link navigation + activation.
 type TextViewViewer struct {
 	*tview.TextView
@@ -40,10 +40,11 @@ type TextViewViewer struct {
 	onSelect       func(*TextViewViewer, nav.NavElement)
 	onStateChanged func(*TextViewViewer)
 
-	lastSelection selectionKey
+	lastSelection  selectionKey
+	lastKnownWidth int
 }
 
-// newTextView creates a new TView markdown viewer backed by a TextView.
+// NewTextView creates a new TView markdown viewer backed by a TextView.
 func NewTextView() *TextViewViewer {
 	textView := tview.NewTextView()
 	textView.SetBorder(false)
@@ -52,23 +53,26 @@ func NewTextView() *TextViewViewer {
 	textView.SetWrap(false)
 	textView.SetWordWrap(false)
 
-	return &TextViewViewer{
+	viewer := &TextViewViewer{
 		TextView:        textView,
 		core:            nav.New(nav.Options{}),
 		backgroundColor: tcell.ColorDefault,
+		lastKnownWidth:  0,
 	}
+
+	return viewer
 }
 
-// core exposes the underlying UI-agnostic markdown session.
+// Core exposes the underlying UI-agnostic markdown session.
 func (v *TextViewViewer) Core() *nav.MarkdownSession { return v.core }
 
-// setAnsiConverter configures optional ANSI->tview conversion. If nil, tview.TranslateANSI is used.
+// SetAnsiConverter configures optional ANSI->tview conversion. If nil, tview.TranslateANSI is used.
 func (v *TextViewViewer) SetAnsiConverter(c *util.AnsiConverter) {
 	v.ansiConverter = c
 	v.refreshDisplayCache()
 }
 
-// setBackgroundColor sets the background color for empty space.
+// SetBackgroundColor sets the background color for empty space.
 // use tcell.ColorDefault to disable background filling (default behavior).
 func (v *TextViewViewer) SetBackgroundColor(color tcell.Color) *TextViewViewer {
 	v.backgroundColor = color
@@ -76,7 +80,7 @@ func (v *TextViewViewer) SetBackgroundColor(color tcell.Color) *TextViewViewer {
 	return v
 }
 
-// setRenderer configures the renderer used by the core viewer.
+// SetRenderer configures the renderer used by the core viewer.
 // this allows dynamic switching between light/dark styles.
 func (v *TextViewViewer) SetRenderer(r nav.Renderer) *TextViewViewer {
 	v.core.SetRenderer(r)
@@ -84,20 +88,21 @@ func (v *TextViewViewer) SetRenderer(r nav.Renderer) *TextViewViewer {
 	return v
 }
 
-// setSelectHandler sets the callback for when Enter is pressed on a selected element.
+// SetSelectHandler sets the callback for when Enter is pressed on a selected element.
 func (v *TextViewViewer) SetSelectHandler(handler func(*TextViewViewer, nav.NavElement)) *TextViewViewer {
 	v.onSelect = handler
 	return v
 }
 
-// setStateChangedHandler sets a callback for when navigation state changes (selection/scroll/history).
+// SetStateChangedHandler sets a callback for when navigation state changes (selection/scroll/history).
 func (v *TextViewViewer) SetStateChangedHandler(handler func(*TextViewViewer)) *TextViewViewer {
 	v.onStateChanged = handler
 	return v
 }
 
-// setMarkdown sets markdown content to display.
+// SetMarkdown sets markdown content to display.
 func (v *TextViewViewer) SetMarkdown(content string) *TextViewViewer {
+	v.ensureWidthConfigured()
 	_ = v.core.SetMarkdown(content)
 	v.refreshDisplayCache()
 	v.ScrollTo(v.core.ScrollOffset(), 0)
@@ -105,8 +110,34 @@ func (v *TextViewViewer) SetMarkdown(content string) *TextViewViewer {
 	return v
 }
 
-// setMarkdownWithSource sets markdown content with source file context.
+func (v *TextViewViewer) ensureWidthConfigured() {
+	_, _, width, _ := v.GetInnerRect()
+	if width > 0 && v.core.CurrentWidth() != width {
+		v.lastKnownWidth = width
+		v.core.SetWidth(width)
+	}
+}
+
+// Draw handles rendering and width changes.
+func (v *TextViewViewer) Draw(screen tcell.Screen) {
+	_, _, width, _ := v.GetInnerRect()
+
+	// Check width change before drawing
+	if width > 0 && width != v.lastKnownWidth {
+		v.lastKnownWidth = width
+		if v.core.SetWidth(width) {
+			v.refreshDisplayCache()
+			v.ScrollTo(v.core.ScrollOffset(), 0)
+			v.fireStateChanged()
+		}
+	}
+
+	v.TextView.Draw(screen)
+}
+
+// SetMarkdownWithSource sets markdown content with source file context.
 func (v *TextViewViewer) SetMarkdownWithSource(content string, sourceFilePath string, pushToHistory bool) *TextViewViewer {
+	v.ensureWidthConfigured()
 	_ = v.core.SetMarkdownWithSource(content, sourceFilePath, pushToHistory)
 	v.refreshDisplayCache()
 	v.ScrollTo(v.core.ScrollOffset(), 0)

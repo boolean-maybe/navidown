@@ -691,3 +691,183 @@ Third section`)
 		}
 	}
 }
+
+func TestMarkdownSession_SetWidthTriggersRerender(t *testing.T) {
+	md := `# Header
+This is a very long line that will wrap differently at different widths.
+[Link](https://example.com)`
+
+	v := New(Options{})
+	_ = v.SetMarkdown(md)
+
+	initialLines := len(v.RenderedLines())
+	if initialLines == 0 {
+		t.Fatal("Expected some rendered lines")
+	}
+
+	// Set width and verify re-render occurred
+	rerendered := v.SetWidth(40)
+	if !rerendered {
+		t.Fatal("Expected SetWidth to trigger re-render")
+	}
+
+	if v.CurrentWidth() != 40 {
+		t.Errorf("Expected width 40, got %d", v.CurrentWidth())
+	}
+
+	// Setting same width should not re-render
+	rerendered = v.SetWidth(40)
+	if rerendered {
+		t.Error("Expected SetWidth with same width to not trigger re-render")
+	}
+}
+
+func TestMarkdownSession_SetWidthPreservesSelection(t *testing.T) {
+	md := `# Header
+[Link1](https://example.com/1)
+[Link2](https://example.com/2)
+[Link3](https://example.com/3)`
+
+	v := New(Options{})
+	_ = v.SetMarkdown(md)
+
+	// Select the second link
+	v.MoveToNextLink(10)
+	v.MoveToNextLink(10)
+
+	selected := v.Selected()
+	if selected == nil || selected.URL != "https://example.com/2" {
+		t.Fatal("Expected Link2 to be selected")
+	}
+
+	selectedURL := selected.URL
+	selectedText := selected.Text
+
+	// Change width - selection should be preserved
+	v.SetWidth(40)
+
+	newSelected := v.Selected()
+	if newSelected == nil {
+		t.Fatal("Expected selection to be preserved after width change")
+	}
+
+	if newSelected.URL != selectedURL || newSelected.Text != selectedText {
+		t.Errorf("Selection changed: expected %s (%s), got %s (%s)",
+			selectedText, selectedURL, newSelected.Text, newSelected.URL)
+	}
+}
+
+func TestMarkdownSession_SetWidthPreservesScrollPosition(t *testing.T) {
+	md := `# Header 1
+Line 1
+Line 2
+Line 3
+
+## Header 2
+Line 4
+Line 5
+Line 6
+
+## Header 3
+Line 7
+Line 8
+Line 9`
+
+	v := New(Options{})
+	_ = v.SetMarkdown(md)
+
+	// Scroll to middle
+	v.scrollOffset = 5
+
+	// Change width - scroll position should be approximately preserved
+	v.SetWidth(40)
+
+	// Scroll position should be near the same content (Header 2 area)
+	// Exact line may differ due to wrapping, but should be > 0 and < total lines
+	if v.ScrollOffset() < 0 || v.ScrollOffset() >= len(v.RenderedLines()) {
+		t.Errorf("Scroll position out of bounds: %d (total lines: %d)",
+			v.ScrollOffset(), len(v.RenderedLines()))
+	}
+}
+
+func TestMarkdownSession_SetWidthNoOpWhenUnchanged(t *testing.T) {
+	md := `# Header
+Some content`
+
+	v := New(Options{})
+	_ = v.SetMarkdown(md)
+
+	// Set width initially
+	v.SetWidth(80)
+	initialLines := v.RenderedLines()
+
+	// Set same width again
+	rerendered := v.SetWidth(80)
+	if rerendered {
+		t.Error("Expected no re-render when width unchanged")
+	}
+
+	// Verify lines didn't change
+	newLines := v.RenderedLines()
+	if len(initialLines) != len(newLines) {
+		t.Error("Lines changed despite no re-render")
+	}
+}
+
+func TestMarkdownSession_SetWidthOnEmptyContent(t *testing.T) {
+	v := New(Options{})
+
+	// Set width before loading content
+	rerendered := v.SetWidth(80)
+	if rerendered {
+		t.Error("Expected no re-render on empty content")
+	}
+
+	if v.CurrentWidth() != 80 {
+		t.Errorf("Expected width to be stored even with empty content, got %d", v.CurrentWidth())
+	}
+
+	// Load content - should use stored width
+	md := "# Header\nSome content"
+	_ = v.SetMarkdown(md)
+
+	if v.CurrentWidth() != 80 {
+		t.Errorf("Expected width to be preserved after loading content, got %d", v.CurrentWidth())
+	}
+}
+
+func TestMarkdownSession_HistoryPreservesWidth(t *testing.T) {
+	v := New(Options{})
+
+	// Load first page at width 80
+	v.SetWidth(80)
+	_ = v.SetMarkdownWithSource("# Page 1\nContent", "/page1.md", false)
+
+	if v.CurrentWidth() != 80 {
+		t.Fatalf("Expected width 80, got %d", v.CurrentWidth())
+	}
+
+	// Navigate to second page (pushes page1 at width 80 to history)
+	_ = v.SetMarkdownWithSource("# Page 2\nMore content", "/page2.md", true)
+
+	// Change width on page 2
+	v.SetWidth(120)
+
+	if v.CurrentWidth() != 120 {
+		t.Fatalf("Expected width 120, got %d", v.CurrentWidth())
+	}
+
+	// Go back - width from history (80) should be restored
+	v.GoBack()
+
+	if v.CurrentWidth() != 80 {
+		t.Errorf("Expected width 80 after going back, got %d", v.CurrentWidth())
+	}
+
+	// Go forward - width (120) should be restored
+	v.GoForward()
+
+	if v.CurrentWidth() != 120 {
+		t.Errorf("Expected width 120 after going forward, got %d", v.CurrentWidth())
+	}
+}
