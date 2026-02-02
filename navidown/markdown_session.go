@@ -14,25 +14,22 @@ import (
 // Example: "Hello World" → "hello-world", "What's New?" → "whats-new"
 func generateSlug(text string) string {
 	var result strings.Builder
-	prevHyphen := true // start as true to avoid leading hyphen
+	trimmed := strings.TrimSpace(text)
 
-	for _, r := range text {
+	for _, r := range trimmed {
 		switch {
 		case unicode.IsLetter(r) || unicode.IsDigit(r):
 			result.WriteRune(unicode.ToLower(r))
-			prevHyphen = false
-		case unicode.IsSpace(r) || r == '-' || r == '_':
-			if !prevHyphen {
-				result.WriteByte('-')
-				prevHyphen = true
-			}
-			// skip other characters (punctuation, etc.)
+		case r == ' ':
+			result.WriteByte('-')
+		case r == '-' || r == '_':
+			result.WriteRune(r)
+		default:
+			// skip punctuation, symbols, emoji, etc.
 		}
 	}
 
-	// trim trailing hyphen
-	s := result.String()
-	return strings.TrimSuffix(s, "-")
+	return result.String()
 }
 
 // MarkdownSession is a UI-agnostic navigable markdown state machine that serves as a model

@@ -423,13 +423,15 @@ func TestGenerateSlug(t *testing.T) {
 		{"Version 2.0", "version-20"},
 		{"  Spaces  ", "spaces"},
 		{"UPPERCASE", "uppercase"},
-		{"multiple---hyphens", "multiple-hyphens"},
-		{"under_scores_work", "under-scores-work"},
+		{"multiple---hyphens", "multiple---hyphens"},
+		{"under_scores_work", "under_scores_work"},
 		{"", ""},
 		{"123", "123"},
 		{"a", "a"},
 		{"Special!@#$%Characters", "specialcharacters"},
 		{"  leading and trailing  ", "leading-and-trailing"},
+		{"Data & State Management", "data--state-management"},
+		{"Security & Compliance", "security--compliance"},
 	}
 
 	for _, tt := range tests {
