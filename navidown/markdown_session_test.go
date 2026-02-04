@@ -563,12 +563,10 @@ func TestViewer_ScrollToAnchor(t *testing.T) {
 }
 
 func TestViewer_ScrollToAnchor_PushesToHistory(t *testing.T) {
-	v := New(Options{Renderer: staticRenderer{lines: []string{
-		"# First",
-		"content",
-		"## Second",
-		"more",
-	}}})
+	v := New(Options{
+		Renderer:             staticRenderer{lines: []string{"# First", "content", "## Second", "more"}},
+		AlwaysScrollToAnchor: true, // Force scroll even when target visible
+	})
 	_ = v.SetMarkdown("# First\ncontent\n## Second\nmore")
 
 	v.elements[0].StartLine = 0
@@ -598,13 +596,16 @@ func TestViewer_ScrollToAnchor_PushesToHistory(t *testing.T) {
 }
 
 func TestViewer_InternalLinkHistory(t *testing.T) {
-	v := New(Options{Renderer: staticRenderer{lines: []string{
-		"# Intro",
-		"[Jump to Details](#details)",
-		"## Details",
-		"Some details here",
-		"[Back to Intro](#intro)",
-	}}})
+	v := New(Options{
+		Renderer: staticRenderer{lines: []string{
+			"# Intro",
+			"[Jump to Details](#details)",
+			"## Details",
+			"Some details here",
+			"[Back to Intro](#intro)",
+		}},
+		AlwaysScrollToAnchor: true, // Force scroll even when target visible
+	})
 	_ = v.SetMarkdown("# Intro\n[Jump to Details](#details)\n## Details\nSome details here\n[Back to Intro](#intro)")
 
 	// set positions manually
@@ -631,6 +632,58 @@ func TestViewer_InternalLinkHistory(t *testing.T) {
 	// go forward
 	if !v.GoForward() {
 		t.Fatal("expected GoForward to succeed")
+	}
+}
+
+func TestViewer_ScrollToAnchor_SkipsScrollWhenVisible(t *testing.T) {
+	v := New(Options{
+		Renderer: staticRenderer{lines: []string{"# First", "content", "## Second", "more"}},
+		// Default: AlwaysScrollToAnchor = false
+	})
+	_ = v.SetMarkdown("# First\ncontent\n## Second\nmore")
+
+	v.elements[0].StartLine = 0
+	v.elements[1].StartLine = 2
+
+	// viewport=4 shows lines 0-3, so "second" at line 2 is visible
+	if !v.ScrollToAnchor("second", 4, true) {
+		t.Fatal("expected ScrollToAnchor to find header")
+	}
+
+	// No history should be pushed since target was already visible
+	if v.CanGoBack() {
+		t.Fatal("expected no history push when target already visible")
+	}
+
+	// Scroll offset should remain at 0 (no scroll)
+	if v.ScrollOffset() != 0 {
+		t.Errorf("expected scrollOffset=0 (no scroll), got %d", v.ScrollOffset())
+	}
+}
+
+func TestViewer_ScrollToAnchor_ScrollsWhenNotVisible(t *testing.T) {
+	v := New(Options{
+		Renderer: staticRenderer{lines: []string{"# First", "content", "## Second", "more", "extra", "lines"}},
+		// Default: AlwaysScrollToAnchor = false
+	})
+	_ = v.SetMarkdown("# First\ncontent\n## Second\nmore\nextra\nlines")
+
+	v.elements[0].StartLine = 0
+	v.elements[1].StartLine = 2
+
+	// viewport=2 shows lines 0-1, so "second" at line 2 is NOT visible
+	if !v.ScrollToAnchor("second", 2, true) {
+		t.Fatal("expected ScrollToAnchor to find header")
+	}
+
+	// History should be pushed since target was not visible
+	if !v.CanGoBack() {
+		t.Fatal("expected history push when target not visible")
+	}
+
+	// Scroll offset should be at header position
+	if v.ScrollOffset() != 2 {
+		t.Errorf("expected scrollOffset=2, got %d", v.ScrollOffset())
 	}
 }
 

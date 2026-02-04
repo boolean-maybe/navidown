@@ -64,6 +64,9 @@ type MarkdownSession struct {
 
 	// rendering
 	currentWidth int // 0 means no wrapping
+
+	// behavior
+	alwaysScrollToAnchor bool
 }
 
 // Options configures a markdownSession.
@@ -71,6 +74,9 @@ type Options struct {
 	Renderer   Renderer
 	Correlator PositionCorrelator
 	HistoryMax int
+	// AlwaysScrollToAnchor controls whether ScrollToAnchor scrolls even when
+	// the target is already visible. Default false (skip scroll if visible).
+	AlwaysScrollToAnchor bool
 }
 
 // New creates a new markdownSession.
@@ -89,11 +95,12 @@ func New(opts Options) *MarkdownSession {
 	}
 
 	return &MarkdownSession{
-		selectedIndex: -1,
-		scrollOffset:  0,
-		history:       NewNavigationHistory[PageState](hmax),
-		renderer:      renderer,
-		correlator:    correlator,
+		selectedIndex:        -1,
+		scrollOffset:         0,
+		history:              NewNavigationHistory[PageState](hmax),
+		renderer:             renderer,
+		correlator:           correlator,
+		alwaysScrollToAnchor: opts.AlwaysScrollToAnchor,
 	}
 }
 
@@ -176,11 +183,16 @@ func (v *MarkdownSession) SetWidth(cols int) bool {
 		return false
 	}
 
-	// Save state
+	// Save state for scroll restoration after re-render
 	selectedElem := v.Selected()
 	var anchorElem *NavElement
 	if v.scrollOffset >= 0 && v.scrollOffset < len(v.renderedLines) {
 		anchorElem = v.findElementNearLine(v.scrollOffset)
+		// Don't use anchor element if it had invalid position (from width=0 render).
+		// This prevents jumping to wrong scroll position when width changes from 0.
+		if anchorElem != nil && anchorElem.EndCol <= anchorElem.StartCol {
+			anchorElem = nil
+		}
 	}
 
 	oldWidth := v.currentWidth
@@ -751,11 +763,18 @@ func (v *MarkdownSession) FindHeaderBySlug(slug string) *NavElement {
 
 // ScrollToAnchor scrolls to a header by its slug.
 // If pushToHistory is true, saves the current position to back history before scrolling.
-// Returns true if the header was found and scrolled to, false otherwise.
+// Returns true if the header was found (and scrolled to if needed), false otherwise.
 func (v *MarkdownSession) ScrollToAnchor(slug string, viewportHeight int, pushToHistory bool) bool {
 	header := v.FindHeaderBySlug(slug)
 	if header == nil {
 		return false
+	}
+
+	// Skip scroll if target already visible (unless always-scroll enabled)
+	if !v.alwaysScrollToAnchor {
+		if header.StartLine >= v.scrollOffset && header.StartLine < v.scrollOffset+viewportHeight {
+			return true
+		}
 	}
 
 	if pushToHistory {
@@ -763,7 +782,7 @@ func (v *MarkdownSession) ScrollToAnchor(slug string, viewportHeight int, pushTo
 	}
 
 	v.scrollOffset = header.StartLine
-	v.selectedIndex = -1
+	// Keep selection so Tab can advance to next link after following an anchor
 
 	// clamp to valid range
 	maxOffset := len(v.renderedLines) - viewportHeight
