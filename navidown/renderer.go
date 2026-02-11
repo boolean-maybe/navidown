@@ -33,6 +33,10 @@ func uintPtr(v uint) *uint {
 	return &v
 }
 
+func stringPtr(v string) *string {
+	return &v
+}
+
 // NewANSIRenderer creates a renderer with the dark style (backwards compatible default).
 func NewANSIRenderer() *ANSIStyleRenderer {
 	return NewANSIRendererWithStyle("dark")
@@ -58,6 +62,9 @@ func NewANSIRendererWithStyle(styleName string) *ANSIStyleRenderer {
 	// Always clear margins for consistent rendering
 	style.Document.Margin = uintPtr(0)
 	style.CodeBlock.Margin = uintPtr(0)
+
+	// soften inline code color from bright red to muted steel blue
+	style.Code.Color = stringPtr("109")
 
 	return &ANSIStyleRenderer{
 		glamourStyle: style,
