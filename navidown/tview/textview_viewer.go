@@ -42,6 +42,9 @@ type TextViewViewer struct {
 
 	lastSelection  selectionKey
 	lastKnownWidth int
+
+	// imageManager handles Kitty image protocol (optional).
+	imageManager *ImageManager
 }
 
 // NewTextView creates a new TView markdown viewer backed by a TextView.
@@ -65,6 +68,14 @@ func NewTextView() *TextViewViewer {
 
 // Core exposes the underlying UI-agnostic markdown session.
 func (v *TextViewViewer) Core() *nav.MarkdownSession { return v.core }
+
+// SetImageManager enables Kitty image protocol support.
+// When set, images in markdown will be rendered as Unicode placeholders.
+func (v *TextViewViewer) SetImageManager(m *ImageManager) *TextViewViewer {
+	v.imageManager = m
+	v.core.SetImagePostProcessor(NewKittyImageProcessor(m))
+	return v
+}
 
 // SetAnsiConverter configures optional ANSI->tview conversion. If nil, tview.TranslateANSI is used.
 func (v *TextViewViewer) SetAnsiConverter(c *util.AnsiConverter) {
@@ -132,7 +143,38 @@ func (v *TextViewViewer) Draw(screen tcell.Screen) {
 		}
 	}
 
+	// Auto-detect cell pixel dimensions and re-process images if cell size changed
+	if v.imageManager != nil {
+		if v.imageManager.UpdateCellSize(screen) {
+			if v.core.ReprocessImages() {
+				v.refreshDisplayCache()
+				v.ScrollTo(v.core.ScrollOffset(), 0)
+			}
+		}
+		if v.imageManager.Supported() {
+			v.transmitVisibleImages(screen)
+		}
+	}
+
 	v.TextView.Draw(screen)
+}
+
+// transmitVisibleImages ensures all images referenced in the document are
+// transmitted to the terminal before rendering.
+func (v *TextViewViewer) transmitVisibleImages(screen tcell.Screen) {
+	if v.imageManager == nil {
+		return
+	}
+	v.imageManager.mu.Lock()
+	ids := make([]uint32, 0, len(v.imageManager.urlToID))
+	for _, id := range v.imageManager.urlToID {
+		ids = append(ids, id)
+	}
+	v.imageManager.mu.Unlock()
+
+	for _, id := range ids {
+		_ = v.imageManager.EnsureTransmitted(screen, id)
+	}
 }
 
 // SetMarkdownWithSource sets markdown content with source file context.

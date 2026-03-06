@@ -39,6 +39,12 @@ func main() {
 	// set custom ANSI converter for proper background color support
 	mdViewer.SetAnsiConverter(util.NewAnsiConverter(true))
 
+	// enable Kitty image protocol support
+	imgResolver := navidown.NewImageResolver([]string{"."})
+	imgManager := tviewAdapter.NewImageManager(imgResolver, 8, 16)
+	imgManager.SetSupported(true)
+	mdViewer.SetImageManager(imgManager)
+
 	// set up content fetcher for link navigation
 	provider := &loaders.FileHTTP{SearchRoots: []string{"."}}
 

@@ -6,6 +6,7 @@ type NavElementType int
 const (
 	NavElementHeader NavElementType = iota
 	NavElementURL
+	NavElementImage
 )
 
 // NavElement represents a navigable item (header or URL).
@@ -52,6 +53,7 @@ type PageState struct {
 	ScrollOffset   int
 	Elements       []NavElement
 	RenderedLines  []string
+	PreImageLines  []string // cached lines before image post-processing
 	Cleaner        LineCleaner
 	Width          int // Rendering width at capture time
 }

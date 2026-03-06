@@ -67,6 +67,10 @@ type MarkdownSession struct {
 
 	// behavior
 	alwaysScrollToAnchor bool
+
+	// image support
+	imagePostProcessor ImagePostProcessor
+	preImageLines      []string // cached lines before image post-processing (for re-processing on cell size change)
 }
 
 // Options configures a markdownSession.
@@ -77,6 +81,10 @@ type Options struct {
 	// AlwaysScrollToAnchor controls whether ScrollToAnchor scrolls even when
 	// the target is already visible. Default false (skip scroll if visible).
 	AlwaysScrollToAnchor bool
+	// ImagePostProcessor, when set, is called after rendering to replace
+	// image placeholder tokens with actual image placeholders (e.g., Kitty
+	// Unicode placeholders). If nil, image tokens are replaced with alt text.
+	ImagePostProcessor ImagePostProcessor
 }
 
 // New creates a new markdownSession.
@@ -101,7 +109,13 @@ func New(opts Options) *MarkdownSession {
 		renderer:             renderer,
 		correlator:           correlator,
 		alwaysScrollToAnchor: opts.AlwaysScrollToAnchor,
+		imagePostProcessor:   opts.ImagePostProcessor,
 	}
+}
+
+// SetImagePostProcessor sets the image post-processor for rendering.
+func (v *MarkdownSession) SetImagePostProcessor(p ImagePostProcessor) {
+	v.imagePostProcessor = p
 }
 
 // SetCorrelator sets the correlation strategy.
@@ -217,6 +231,7 @@ func (v *MarkdownSession) reRenderWithWidth(cols int) error {
 
 	v.renderedLines = rendered.Lines
 	v.setCleaner(rendered.Cleaner)
+	v.postProcessImages()
 	v.correlatePositions()
 	return nil
 }
@@ -330,6 +345,7 @@ func (v *MarkdownSession) SetMarkdownWithSource(content string, sourceFilePath s
 	v.renderedLines = rendered.Lines
 	v.setCleaner(rendered.Cleaner)
 
+	v.postProcessImages()
 	v.correlatePositions()
 
 	v.selectedIndex = -1
@@ -395,12 +411,73 @@ func (v *MarkdownSession) parseMarkdownWithSource(source []byte, sourceFilePath 
 				URL:            string(n.URL(source)),
 				SourceFilePath: sourceFilePath,
 			})
+		case *ast.Image:
+			altText := string(n.Text(source)) //nolint: staticcheck
+			elements = append(elements, NavElement{
+				Type:           NavElementImage,
+				Text:           altText,
+				URL:            string(n.Destination),
+				SourceFilePath: sourceFilePath,
+			})
 		}
 
 		return ast.WalkContinue, nil
 	})
 
 	return elements
+}
+
+// postProcessImages replaces image placeholder tokens in rendered lines.
+// If an ImagePostProcessor is configured, it delegates to that.
+// Otherwise, image tokens are replaced with fallback alt text.
+func (v *MarkdownSession) postProcessImages() {
+	if len(v.renderedLines) == 0 {
+		v.preImageLines = nil
+		return
+	}
+
+	// Check if any lines contain image tokens
+	hasTokens := false
+	for _, line := range v.renderedLines {
+		if ContainsImageToken(line) {
+			hasTokens = true
+			break
+		}
+	}
+	if !hasTokens {
+		v.preImageLines = nil
+		return
+	}
+
+	// Cache pre-image lines so ReprocessImages() can re-run with updated cell dimensions
+	v.preImageLines = make([]string, len(v.renderedLines))
+	copy(v.preImageLines, v.renderedLines)
+
+	if v.imagePostProcessor != nil {
+		v.renderedLines = v.imagePostProcessor.ProcessImageTokens(
+			v.renderedLines, v.currentSourceFile, v.currentWidth,
+		)
+	} else {
+		fallback := &FallbackImageProcessor{}
+		v.renderedLines = fallback.ProcessImageTokens(
+			v.renderedLines, v.currentSourceFile, v.currentWidth,
+		)
+	}
+}
+
+// ReprocessImages re-runs image post-processing using cached pre-image lines.
+// This is called when terminal cell dimensions change after initial rendering,
+// so placeholder grids are regenerated with the correct cell size.
+// Returns true if reprocessing occurred, false if no cached lines are available.
+func (v *MarkdownSession) ReprocessImages() bool {
+	if len(v.preImageLines) == 0 {
+		return false
+	}
+	v.renderedLines = make([]string, len(v.preImageLines))
+	copy(v.renderedLines, v.preImageLines)
+	v.postProcessImages()
+	v.correlatePositions()
+	return true
 }
 
 func (v *MarkdownSession) correlatePositions() {
@@ -476,6 +553,12 @@ func (v *MarkdownSession) saveCurrentState() PageState {
 	linesCopy := make([]string, len(v.renderedLines))
 	copy(linesCopy, v.renderedLines)
 
+	var preImageCopy []string
+	if len(v.preImageLines) > 0 {
+		preImageCopy = make([]string, len(v.preImageLines))
+		copy(preImageCopy, v.preImageLines)
+	}
+
 	return PageState{
 		Markdown:       v.markdown,
 		SourceFilePath: v.currentSourceFile,
@@ -483,6 +566,7 @@ func (v *MarkdownSession) saveCurrentState() PageState {
 		ScrollOffset:   v.scrollOffset,
 		Elements:       elementsCopy,
 		RenderedLines:  linesCopy,
+		PreImageLines:  preImageCopy,
 		Cleaner:        v.cleaner,
 		Width:          v.currentWidth,
 	}
@@ -499,6 +583,13 @@ func (v *MarkdownSession) restoreState(state PageState) {
 	v.renderedLines = make([]string, len(state.RenderedLines))
 	copy(v.renderedLines, state.RenderedLines)
 	v.setCleaner(state.Cleaner)
+
+	if len(state.PreImageLines) > 0 {
+		v.preImageLines = make([]string, len(state.PreImageLines))
+		copy(v.preImageLines, state.PreImageLines)
+	} else {
+		v.preImageLines = nil
+	}
 
 	v.selectedIndex = state.SelectedIndex
 	if v.selectedIndex < 0 || v.selectedIndex >= len(v.elements) {

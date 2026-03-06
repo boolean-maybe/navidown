@@ -34,6 +34,9 @@ type BoxViewer struct {
 	onStateChanged func(*BoxViewer)
 
 	lastKnownWidth int
+
+	// imageManager handles Kitty image protocol (optional).
+	imageManager *ImageManager
 }
 
 // newBox creates a new TView markdown viewer backed by a Box.
@@ -48,8 +51,16 @@ func NewBox() *BoxViewer {
 	}
 }
 
-// core exposes the underlying UI-agnostic markdown session.
+// Core exposes the underlying UI-agnostic markdown session.
 func (v *BoxViewer) Core() *nav.MarkdownSession { return v.core }
+
+// SetImageManager enables Kitty image protocol support.
+// When set, images in markdown will be rendered as Unicode placeholders.
+func (v *BoxViewer) SetImageManager(m *ImageManager) *BoxViewer {
+	v.imageManager = m
+	v.core.SetImagePostProcessor(NewKittyImageProcessor(m))
+	return v
+}
 
 // setAnsiConverter configures optional ANSI->tview conversion. If nil, tview.TranslateANSI is used.
 func (v *BoxViewer) SetAnsiConverter(c *util.AnsiConverter) {
@@ -144,6 +155,18 @@ func (v *BoxViewer) Draw(screen tcell.Screen) {
 		highlightEnd = sel.EndCol
 	}
 
+	// Auto-detect cell pixel dimensions and re-process images if cell size changed
+	if v.imageManager != nil {
+		if v.imageManager.UpdateCellSize(screen) {
+			if v.core.ReprocessImages() {
+				v.refreshDisplayCache()
+			}
+		}
+		if v.imageManager.Supported() {
+			v.transmitVisibleImages(screen)
+		}
+	}
+
 	scroll := v.core.ScrollOffset()
 	for row := 0; row < height; row++ {
 		lineIdx := scroll + row
@@ -156,6 +179,24 @@ func (v *BoxViewer) Draw(screen tcell.Screen) {
 			hs, he = highlightStart, highlightEnd
 		}
 		v.drawLine(screen, x, y+row, width, line, hs, he, v.backgroundColor)
+	}
+}
+
+// transmitVisibleImages ensures all images referenced in visible lines are
+// transmitted to the terminal before rendering.
+func (v *BoxViewer) transmitVisibleImages(screen tcell.Screen) {
+	if v.imageManager == nil {
+		return
+	}
+	v.imageManager.mu.Lock()
+	ids := make([]uint32, 0, len(v.imageManager.urlToID))
+	for _, id := range v.imageManager.urlToID {
+		ids = append(ids, id)
+	}
+	v.imageManager.mu.Unlock()
+
+	for _, id := range ids {
+		_ = v.imageManager.EnsureTransmitted(screen, id)
 	}
 }
 
@@ -239,10 +280,56 @@ func (v *BoxViewer) drawLine(screen tcell.Screen, x, y, width int, line string, 
 			style = style.Reverse(true)
 		}
 
-		screen.SetContent(x+col, y, runes[i], nil, style)
-		col++
+		// Collect combining characters that follow the base rune.
+		// This is needed for Kitty image placeholders where U+10EEEE
+		// is followed by combining diacritics encoding row/column.
+		baseRune := runes[i]
 		i++
+		var combining []rune
+		for i < len(runes) && isCombining(runes[i]) {
+			combining = append(combining, runes[i])
+			i++
+		}
+
+		screen.SetContent(x+col, y, baseRune, combining, style)
+		col++
 	}
+}
+
+// isCombining returns true if the rune is a Unicode combining character.
+// This covers the combining diacritical marks used by Kitty image placeholders.
+func isCombining(r rune) bool {
+	// General combining marks ranges used in Kitty protocol diacritics
+	return (r >= 0x0300 && r <= 0x036F) || // Combining Diacritical Marks
+		(r >= 0x0483 && r <= 0x0489) || // Cyrillic combining
+		(r >= 0x0591 && r <= 0x05C7) || // Hebrew combining
+		(r >= 0x0610 && r <= 0x065F) || // Arabic combining
+		(r >= 0x06D6 && r <= 0x06ED) || // Arabic combining extended
+		(r >= 0x0730 && r <= 0x074A) || // Syriac combining
+		(r >= 0x07EB && r <= 0x07F3) || // NKo combining
+		(r >= 0x0816 && r <= 0x082D) || // Samaritan combining
+		(r >= 0x0951 && r <= 0x0954) || // Devanagari combining
+		(r >= 0x0F82 && r <= 0x0F87) || // Tibetan combining
+		(r >= 0x135D && r <= 0x135F) || // Ethiopic combining
+		(r == 0x17DD) || // Khmer combining
+		(r == 0x193A) || // Limbu combining
+		(r >= 0x1A17 && r <= 0x1A7F) || // Tai Tham combining
+		(r >= 0x1B6B && r <= 0x1B73) || // Balinese combining
+		(r >= 0x1CD0 && r <= 0x1CE8) || // Vedic Extensions combining
+		(r >= 0x1DC0 && r <= 0x1DFF) || // Combining Diacritical Marks Supplement
+		(r >= 0x20D0 && r <= 0x20F0) || // Combining Diacritical Marks for Symbols
+		(r >= 0x2CEF && r <= 0x2CF1) || // Coptic combining
+		(r >= 0x2DE0 && r <= 0x2DFF) || // Cyrillic Extended-A combining
+		(r >= 0xA66F && r <= 0xA69F) || // Cyrillic Extended-B combining
+		(r >= 0xA6F0 && r <= 0xA6F1) || // Bamum combining
+		(r >= 0xA8E0 && r <= 0xA8F1) || // Devanagari Extended combining
+		(r >= 0xAAB0 && r <= 0xAAC1) || // Tai Viet combining
+		(r >= 0xFE20 && r <= 0xFE2F) || // Combining Half Marks
+		(r == 0x10A0F) || // Kharoshthi combining
+		(r == 0x10A38) || // Kharoshthi combining
+		(r >= 0x1D185 && r <= 0x1D189) || // Musical Symbols combining
+		(r >= 0x1D1AA && r <= 0x1D1AD) || // Musical Symbols combining
+		(r >= 0x1D242 && r <= 0x1D244) // Combining Greek Musical Notation
 }
 
 func findTagEnd(runes []rune, start int) int {
