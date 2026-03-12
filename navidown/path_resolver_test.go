@@ -142,6 +142,72 @@ func TestResolveMarkdownPath_EmptyURL(t *testing.T) {
 	}
 }
 
+func TestResolveMarkdownPath_MultipleParentSegments(t *testing.T) {
+	// Build: tmpDir/project/.doc/tiki/tiki-test.md referencing ../../res/image.png
+	// Target: tmpDir/project/res/image.png
+	tmpDir := t.TempDir()
+	projectDir := filepath.Join(tmpDir, "project")
+	docDir := filepath.Join(projectDir, ".doc", "tiki")
+	resDir := filepath.Join(projectDir, "res")
+
+	if err := os.MkdirAll(docDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(resDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	sourceFile := filepath.Join(docDir, "tiki-test.md")
+	if err := os.WriteFile(sourceFile, []byte("# Test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	imageFile := filepath.Join(resDir, "image.png")
+	if err := os.WriteFile(imageFile, []byte("PNG"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name     string
+		url      string
+		expected string
+	}{
+		{name: "Two parent segments", url: "../../res/image.png", expected: imageFile},
+		{name: "One parent segment", url: "../tiki/tiki-test.md", expected: sourceFile},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ResolveMarkdownPath(tt.url, sourceFile, nil)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if result != tt.expected {
+				t.Errorf("expected %s, got %s", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestResolveMarkdownPath_DeepTraversalToSensitiveDir(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+	}{
+		{name: "Deep traversal to etc", url: "../../../etc/passwd"},
+		{name: "Two segments to etc", url: "../../etc/passwd"},
+		{name: "One segment to proc", url: "../proc/cpuinfo"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ResolveMarkdownPath(tt.url, "", nil)
+			if !errors.Is(err, ErrDirectoryTraversal) {
+				t.Errorf("expected ErrDirectoryTraversal for %q, got %v", tt.url, err)
+			}
+		})
+	}
+}
+
 func TestContainsDirectoryTraversal_AbsoluteSensitivePaths(t *testing.T) {
 	tests := []struct {
 		name          string

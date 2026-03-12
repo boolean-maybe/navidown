@@ -95,18 +95,6 @@ func containsDirectoryTraversal(path string) bool {
 		cleaned := filepath.Clean(path)
 		parts := strings.Split(cleaned, string(filepath.Separator))
 
-		escapeCount := 0
-		for _, part := range parts {
-			if part == ".." {
-				escapeCount++
-			} else {
-				break
-			}
-		}
-		if escapeCount > 1 {
-			return true
-		}
-
 		sensitivePatterns := []string{"etc", "var", "usr", "sys", "proc", "root"}
 		for _, part := range parts {
 			for _, sensitive := range sensitivePatterns {

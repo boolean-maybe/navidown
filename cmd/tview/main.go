@@ -42,6 +42,8 @@ func main() {
 	// enable Kitty image protocol support
 	imgResolver := navidown.NewImageResolver([]string{"."})
 	imgManager := tviewAdapter.NewImageManager(imgResolver, 8, 16)
+	// Allow images to take up to their natural size (0 = no limit)
+	imgManager.SetMaxRows(40)
 	imgManager.SetSupported(true)
 	mdViewer.SetImageManager(imgManager)
 
