@@ -21,10 +21,14 @@ type ImageInfo struct {
 	Data   []byte // Raw image bytes (for transmission)
 }
 
+const defaultSVGRasterWidth = 2048
+
 // ImageResolver fetches images and decodes their dimensions.
 type ImageResolver struct {
-	searchRoots []string
-	cache       sync.Map // url -> *ImageInfo
+	searchRoots    []string
+	cache          sync.Map // url -> *ImageInfo
+	svgRasterizer  SVGRasterizer
+	svgRasterWidth int
 }
 
 // NewImageResolver creates a new resolver.
@@ -32,6 +36,17 @@ func NewImageResolver(searchRoots []string) *ImageResolver {
 	return &ImageResolver{
 		searchRoots: searchRoots,
 	}
+}
+
+// SetSVGRasterizer overrides the default ResvgRasterizer (useful for testing).
+func (r *ImageResolver) SetSVGRasterizer(rast SVGRasterizer) {
+	r.svgRasterizer = rast
+}
+
+// SetSVGRasterWidth sets the width in pixels used when rasterizing SVG.
+// Zero means use the default (2048).
+func (r *ImageResolver) SetSVGRasterWidth(px int) {
+	r.svgRasterWidth = px
 }
 
 // Resolve fetches an image and returns its info. Results are cached.
@@ -47,6 +62,13 @@ func (r *ImageResolver) Resolve(url string, sourceFilePath string) (*ImageInfo, 
 		return nil, err
 	}
 
+	if isSVGData(data) {
+		data, err = r.rasterizeSVG(data)
+		if err != nil {
+			return nil, fmt.Errorf("rasterize SVG %q: %w", url, err)
+		}
+	}
+
 	info, err := decodeImageInfo(data)
 	if err != nil {
 		return nil, fmt.Errorf("decode image %q: %w", url, err)
@@ -54,6 +76,18 @@ func (r *ImageResolver) Resolve(url string, sourceFilePath string) (*ImageInfo, 
 
 	r.cache.Store(url, info)
 	return info, nil
+}
+
+func (r *ImageResolver) rasterizeSVG(data []byte) ([]byte, error) {
+	rast := r.svgRasterizer
+	if rast == nil {
+		rast = &ResvgRasterizer{}
+	}
+	width := r.svgRasterWidth
+	if width <= 0 {
+		width = defaultSVGRasterWidth
+	}
+	return rast.Rasterize(data, width)
 }
 
 func (r *ImageResolver) fetchImageBytes(url string, sourceFilePath string) ([]byte, error) {

@@ -86,6 +86,35 @@ func TestMarkdownSession_ImagePostProcessor(t *testing.T) {
 	}
 }
 
+func TestMarkdownSession_SVGImageExtraction(t *testing.T) {
+	session := New(Options{})
+
+	md := "# Title\n\n![diagram](arch.svg)\n\nSome text with a [link](other.md).\n"
+	if err := session.SetMarkdown(md); err != nil {
+		t.Fatalf("SetMarkdown: %v", err)
+	}
+
+	elements := session.Elements()
+
+	var images int
+	for _, elem := range elements {
+		if elem.Type != NavElementImage {
+			continue
+		}
+		images++
+		if elem.Text != "diagram" {
+			t.Errorf("image text: got %q, want %q", elem.Text, "diagram")
+		}
+		if elem.URL != "arch.svg" {
+			t.Errorf("image URL: got %q, want %q", elem.URL, "arch.svg")
+		}
+	}
+
+	if images != 1 {
+		t.Errorf("images: got %d, want 1", images)
+	}
+}
+
 type testImageProcessor struct{}
 
 func (p *testImageProcessor) ProcessImageTokens(lines []string, _ string, _ int) []string {

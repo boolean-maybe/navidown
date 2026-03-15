@@ -305,7 +305,7 @@ func getEnvironmentStyle() string {
 
 func getDefaultStyle(style string) (*ansi.StyleConfig, error) {
 	if style == styles.AutoStyle {
-		if !term.IsTerminal(int(os.Stdout.Fd())) {
+		if !term.IsTerminal(int(os.Stdout.Fd())) { // #nosec G115 -- fd is a small file descriptor
 			return &styles.NoTTYStyleConfig, nil
 		}
 		if termenv.HasDarkBackground() {

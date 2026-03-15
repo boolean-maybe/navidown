@@ -151,7 +151,7 @@ func loadContent(arg string) (content string, sourcePath string, err error) {
 		return "", "", fmt.Errorf("failed to resolve path: %w", err)
 	}
 
-	data, err := os.ReadFile(absPath)
+	data, err := os.ReadFile(absPath) // #nosec G703 -- path is user's own CLI argument
 	if err != nil {
 		return "", "", fmt.Errorf("failed to read file: %w", err)
 	}

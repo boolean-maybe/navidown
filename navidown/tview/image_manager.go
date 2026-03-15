@@ -28,6 +28,7 @@ type ImageManager struct {
 	idToInfo    map[uint32]*nav.ImageInfo
 	idToDisplay map[uint32]imageDisplay
 	supported   *bool // nil = unknown, pointer to bool = detected
+	purgedStale bool  // true after initial purge of stale Kitty images
 	resolver    *nav.ImageResolver
 	cellWidth   int
 	cellHeight  int
@@ -216,6 +217,16 @@ func (m *ImageManager) ResolveAndAllocate(url, sourceFilePath string, maxCols in
 // Must be called during Draw() when we have access to the screen.
 func (m *ImageManager) EnsureTransmitted(screen tcell.Screen, id uint32) error {
 	m.mu.Lock()
+	// On first transmission, purge any stale images left in Kitty's cache
+	// from previous runs. Without this, Kitty may serve a cached image under
+	// the same ID instead of accepting the newly transmitted data.
+	if !m.purgedStale {
+		m.purgedStale = true
+		m.mu.Unlock()
+		m.DeleteAll(screen)
+		m.mu.Lock()
+	}
+
 	if m.transmitted[id] {
 		m.mu.Unlock()
 		return nil

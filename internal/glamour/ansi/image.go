@@ -79,7 +79,7 @@ func looksLikeImage(url string) bool {
 	if idx := strings.IndexAny(lower, "?#"); idx >= 0 {
 		lower = lower[:idx]
 	}
-	for _, ext := range []string{".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tiff", ".tif"} {
+	for _, ext := range []string{".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".svg"} {
 		if strings.HasSuffix(lower, ext) {
 			return true
 		}
