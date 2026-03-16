@@ -71,6 +71,9 @@ type MarkdownSession struct {
 	// image support
 	imagePostProcessor ImagePostProcessor
 	preImageLines      []string // cached lines before image post-processing (for re-processing on cell size change)
+
+	// mermaid support
+	mermaidRenderer *MermaidRenderer
 }
 
 // Options configures a markdownSession.
@@ -85,6 +88,11 @@ type Options struct {
 	// image placeholder tokens with actual image placeholders (e.g., Kitty
 	// Unicode placeholders). If nil, image tokens are replaced with alt text.
 	ImagePostProcessor ImagePostProcessor
+	// MermaidOptions, when non-nil, enables mermaid diagram rendering.
+	// Mermaid fenced code blocks are pre-rendered to PNG via mmdc and
+	// inserted as images into the markdown before parsing/rendering.
+	// If mmdc is not found, mermaid support is silently disabled.
+	MermaidOptions *MermaidOptions
 }
 
 // New creates a new markdownSession.
@@ -102,6 +110,12 @@ func New(opts Options) *MarkdownSession {
 		hmax = 50
 	}
 
+	var mermaid *MermaidRenderer
+	if opts.MermaidOptions != nil {
+		mermaid = NewMermaidRenderer(*opts.MermaidOptions)
+		// mermaid is nil if mmdc not found — silent degradation
+	}
+
 	return &MarkdownSession{
 		selectedIndex:        -1,
 		scrollOffset:         0,
@@ -110,6 +124,27 @@ func New(opts Options) *MarkdownSession {
 		correlator:           correlator,
 		alwaysScrollToAnchor: opts.AlwaysScrollToAnchor,
 		imagePostProcessor:   opts.ImagePostProcessor,
+		mermaidRenderer:      mermaid,
+	}
+}
+
+// Close releases resources held by the session (e.g., mermaid temp files).
+func (v *MarkdownSession) Close() {
+	if v.mermaidRenderer != nil {
+		v.mermaidRenderer.Close()
+	}
+}
+
+// SetMermaidOptions enables or disables mermaid diagram rendering.
+// Pass nil to disable. If mmdc is not found, mermaid is silently disabled.
+// Closes any existing mermaid renderer before replacing it.
+func (v *MarkdownSession) SetMermaidOptions(opts *MermaidOptions) {
+	if v.mermaidRenderer != nil {
+		v.mermaidRenderer.Close()
+		v.mermaidRenderer = nil
+	}
+	if opts != nil {
+		v.mermaidRenderer = NewMermaidRenderer(*opts)
 	}
 }
 
@@ -224,7 +259,8 @@ func (v *MarkdownSession) SetWidth(cols int) bool {
 }
 
 func (v *MarkdownSession) reRenderWithWidth(cols int) error {
-	rendered, err := v.rendererForWidth(cols).Render(v.markdown)
+	processed := v.preprocessForRender(v.markdown)
+	rendered, err := v.rendererForWidth(cols).Render(processed)
 	if err != nil {
 		return err
 	}
@@ -317,6 +353,10 @@ func (v *MarkdownSession) elementsMatch(e1, e2 *NavElement) bool {
 	return e1.URL == e2.URL && e1.Text == e2.Text
 }
 
+func (v *MarkdownSession) preprocessForRender(markdown string) string {
+	return preprocessMermaid(markdown, v.mermaidRenderer)
+}
+
 // SetMarkdown loads markdown. If pushToHistory is true, it stores the current page in back history first.
 func (v *MarkdownSession) SetMarkdown(content string) error {
 	return v.SetMarkdownWithSource(content, "", false)
@@ -325,10 +365,13 @@ func (v *MarkdownSession) SetMarkdown(content string) error {
 // SetMarkdownWithSource loads markdown with source file context.
 // State is only mutated if rendering succeeds, ensuring the viewer remains valid on error.
 func (v *MarkdownSession) SetMarkdownWithSource(content string, sourceFilePath string, pushToHistory bool) error {
-	// Parse and render BEFORE mutating state to ensure atomicity
-	tmpElements := v.parseMarkdownWithSource([]byte(content), sourceFilePath)
+	// preprocess mermaid blocks before parsing/rendering
+	processed := v.preprocessForRender(content)
 
-	rendered, err := v.rendererForWidth(v.currentWidth).Render(content)
+	// Parse and render BEFORE mutating state to ensure atomicity
+	tmpElements := v.parseMarkdownWithSource([]byte(processed), sourceFilePath)
+
+	rendered, err := v.rendererForWidth(v.currentWidth).Render(processed)
 	if err != nil {
 		return err // Nothing mutated, viewer still valid
 	}

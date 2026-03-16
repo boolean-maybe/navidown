@@ -47,6 +47,9 @@ func main() {
 	imgManager.SetSupported(true)
 	mdViewer.SetImageManager(imgManager)
 
+	// enable mermaid diagram rendering (requires mmdc in PATH)
+	mdViewer.Core().SetMermaidOptions(&navidown.MermaidOptions{Theme: "dark"})
+
 	// set up content fetcher for link navigation
 	provider := &loaders.FileHTTP{SearchRoots: []string{"."}}
 
