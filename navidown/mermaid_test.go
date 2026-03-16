@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -13,29 +14,14 @@ import (
 func newTestMermaidRenderer(t *testing.T) *MermaidRenderer {
 	t.Helper()
 
-	// create a fixture 1x1 PNG (minimal valid PNG)
 	fixturePNG := minimalPNG()
-
-	// create a fake mmdc script that writes the fixture PNG to the -o argument
 	scriptDir := t.TempDir()
-	scriptPath := filepath.Join(scriptDir, "fake-mmdc")
-
-	script := fmt.Sprintf(`#!/bin/sh
-# parse -o flag to find output path
-while [ $# -gt 0 ]; do
-  case "$1" in
-    -o) shift; cp "%s" "$1" ;;
-  esac
-  shift
-done
-`, filepath.Join(scriptDir, "fixture.png"))
 
 	if err := os.WriteFile(filepath.Join(scriptDir, "fixture.png"), fixturePNG, 0644); err != nil {
 		t.Fatalf("write fixture PNG: %v", err)
 	}
-	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
-		t.Fatalf("write fake mmdc: %v", err)
-	}
+
+	scriptPath := writeFakeMmdc(t, scriptDir, filepath.Join(scriptDir, "fixture.png"))
 
 	cacheDir := t.TempDir()
 	renderer := NewMermaidRenderer(MermaidOptions{MmdcPath: scriptPath, CacheDir: cacheDir})
@@ -44,6 +30,118 @@ done
 	}
 	t.Cleanup(renderer.Close)
 	return renderer
+}
+
+// writeFakeMmdc creates a platform-appropriate fake mmdc executable that copies
+// fixturePath to the -o argument. Returns the path to the executable.
+func writeFakeMmdc(t *testing.T, dir, fixturePath string) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		return writeFakeMmdcBat(t, dir, fixturePath)
+	}
+	return writeFakeMmdcSh(t, dir, fixturePath)
+}
+
+func writeFakeMmdcSh(t *testing.T, dir, fixturePath string) string {
+	t.Helper()
+	scriptPath := filepath.Join(dir, "fake-mmdc")
+	script := fmt.Sprintf(`#!/bin/sh
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) shift; cp "%s" "$1" ;;
+  esac
+  shift
+done
+`, fixturePath)
+	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+		t.Fatalf("write fake mmdc: %v", err)
+	}
+	return scriptPath
+}
+
+func writeFakeMmdcBat(t *testing.T, dir, fixturePath string) string {
+	t.Helper()
+	batPath := filepath.Join(dir, "fake-mmdc.bat")
+	fixturePath = filepath.FromSlash(fixturePath)
+	script := fmt.Sprintf("@echo off\r\n:loop\r\nif \"%%~1\"==\"\" goto end\r\nif \"%%~1\"==\"-o\" (\r\n  copy /Y \"%s\" \"%%~2\" >nul\r\n  shift\r\n)\r\nshift\r\ngoto loop\r\n:end\r\n", fixturePath)
+	if err := os.WriteFile(batPath, []byte(script), 0755); err != nil {
+		t.Fatalf("write fake mmdc.bat: %v", err)
+	}
+	return batPath
+}
+
+// dummyExecutable returns a path to an executable that exists on all platforms.
+// Used when tests need a valid MmdcPath but never actually invoke it.
+func dummyExecutable() string {
+	if runtime.GOOS == "windows" {
+		return "cmd.exe"
+	}
+	return "/bin/echo"
+}
+
+// writeFailingMmdc creates a platform-appropriate fake mmdc that always exits with code 1.
+func writeFailingMmdc(t *testing.T, dir string) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		p := filepath.Join(dir, "bad-mmdc.bat")
+		if err := os.WriteFile(p, []byte("@echo off\r\nexit /b 1\r\n"), 0755); err != nil {
+			t.Fatalf("write bad mmdc.bat: %v", err)
+		}
+		return p
+	}
+	p := filepath.Join(dir, "bad-mmdc")
+	if err := os.WriteFile(p, []byte("#!/bin/sh\nexit 1\n"), 0755); err != nil {
+		t.Fatalf("write bad mmdc: %v", err)
+	}
+	return p
+}
+
+// writeFakeMmdcWithCounter creates a fake mmdc that copies fixturePath to the -o
+// argument AND increments a counter file on each invocation.
+// Returns (scriptPath, counterPath).
+func writeFakeMmdcWithCounter(t *testing.T, dir, fixturePath string) (string, string) {
+	t.Helper()
+	counterPath := filepath.Join(dir, "counter")
+	if runtime.GOOS == "windows" {
+		return writeFakeMmdcWithCounterBat(t, dir, fixturePath, counterPath), counterPath
+	}
+	return writeFakeMmdcWithCounterSh(t, dir, fixturePath, counterPath), counterPath
+}
+
+func writeFakeMmdcWithCounterSh(t *testing.T, dir, fixturePath, counterPath string) string {
+	t.Helper()
+	scriptPath := filepath.Join(dir, "fake-mmdc")
+	script := fmt.Sprintf(`#!/bin/sh
+count=0
+if [ -f "%s" ]; then
+  count=$(cat "%s")
+fi
+count=$((count + 1))
+echo $count > "%s"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) shift; cp "%s" "$1" ;;
+  esac
+  shift
+done
+`, counterPath, counterPath, counterPath, fixturePath)
+	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+		t.Fatalf("write fake mmdc: %v", err)
+	}
+	return scriptPath
+}
+
+func writeFakeMmdcWithCounterBat(t *testing.T, dir, fixturePath, counterPath string) string {
+	t.Helper()
+	batPath := filepath.Join(dir, "fake-mmdc.bat")
+	fixturePath = filepath.FromSlash(fixturePath)
+	counterPath = filepath.FromSlash(counterPath)
+	// batch script that increments a counter file and copies fixture to -o target
+	script := fmt.Sprintf("@echo off\r\nsetlocal enabledelayedexpansion\r\nset count=0\r\nif exist \"%s\" (\r\n  set /p count=<\"%s\"\r\n)\r\nset /a count=count+1\r\necho !count!>\"%s\"\r\n:loop\r\nif \"%%~1\"==\"\" goto end\r\nif \"%%~1\"==\"-o\" (\r\n  copy /Y \"%s\" \"%%~2\" >nul\r\n  shift\r\n)\r\nshift\r\ngoto loop\r\n:end\r\n", counterPath, counterPath, counterPath, fixturePath)
+	if err := os.WriteFile(batPath, []byte(script), 0755); err != nil {
+		t.Fatalf("write fake mmdc.bat: %v", err)
+	}
+	return batPath
 }
 
 // minimalPNG returns bytes of a valid 1x1 white PNG.
@@ -116,12 +214,8 @@ func TestPreprocessMermaid_MixedContent(t *testing.T) {
 }
 
 func TestPreprocessMermaid_ErrorPreservesBlock(t *testing.T) {
-	// create a renderer with a failing mmdc
 	scriptDir := t.TempDir()
-	scriptPath := filepath.Join(scriptDir, "bad-mmdc")
-	if err := os.WriteFile(scriptPath, []byte("#!/bin/sh\nexit 1\n"), 0755); err != nil {
-		t.Fatalf("write bad mmdc: %v", err)
-	}
+	scriptPath := writeFailingMmdc(t, scriptDir)
 
 	cacheDir := t.TempDir()
 	renderer := NewMermaidRenderer(MermaidOptions{MmdcPath: scriptPath, CacheDir: cacheDir})
@@ -161,8 +255,11 @@ func TestMermaidRenderer_Caching(t *testing.T) {
 func TestMermaidRenderer_Close_PersistentDir(t *testing.T) {
 	persistentDir := t.TempDir()
 
+	// use any executable that exists on all platforms as a dummy mmdcPath
+	dummyExe := dummyExecutable()
+
 	renderer := NewMermaidRenderer(MermaidOptions{
-		MmdcPath: "/bin/echo",
+		MmdcPath: dummyExe,
 		CacheDir: persistentDir,
 	})
 	if renderer == nil {
@@ -182,7 +279,7 @@ func TestMermaidRenderer_Close_TempDir(t *testing.T) {
 	// We can't easily mock UserCacheDir, so we test the tempDir path directly.
 	renderer := &MermaidRenderer{
 		opts:     MermaidOptions{},
-		mmdcPath: "/bin/echo",
+		mmdcPath: dummyExecutable(),
 	}
 
 	td, err := os.MkdirTemp("", "navidown-mermaid-test-")
@@ -374,34 +471,13 @@ func TestReassembleMermaid(t *testing.T) {
 }
 
 func TestMermaidRenderer_DiskCache(t *testing.T) {
-	// set up shared cache dir and fake mmdc
 	fixturePNG := minimalPNG()
 	scriptDir := t.TempDir()
-	scriptPath := filepath.Join(scriptDir, "fake-mmdc")
-	counterPath := filepath.Join(scriptDir, "counter")
-
-	// fake mmdc that increments a counter file on each call
-	script := fmt.Sprintf(`#!/bin/sh
-count=0
-if [ -f "%s" ]; then
-  count=$(cat "%s")
-fi
-count=$((count + 1))
-echo $count > "%s"
-while [ $# -gt 0 ]; do
-  case "$1" in
-    -o) shift; cp "%s" "$1" ;;
-  esac
-  shift
-done
-`, counterPath, counterPath, counterPath, filepath.Join(scriptDir, "fixture.png"))
 
 	if err := os.WriteFile(filepath.Join(scriptDir, "fixture.png"), fixturePNG, 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
-		t.Fatal(err)
-	}
+	scriptPath, counterPath := writeFakeMmdcWithCounter(t, scriptDir, filepath.Join(scriptDir, "fixture.png"))
 
 	cacheDir := t.TempDir()
 	source := "graph TD\n    A-->B\n"

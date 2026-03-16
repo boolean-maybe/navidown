@@ -4,11 +4,36 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 )
+
+// writeSlowMmdc creates a platform-appropriate fake mmdc that sleeps for delay
+// milliseconds before copying fixturePath to the -o argument.
+func writeSlowMmdc(t *testing.T, dir, fixturePath string, delayMs int) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		batPath := filepath.Join(dir, "slow-mmdc.bat")
+		fixturePath = filepath.FromSlash(fixturePath)
+		// ping -n N waits roughly (N-1) seconds; for sub-second we use powershell
+		script := fmt.Sprintf("@echo off\r\npowershell -Command \"Start-Sleep -Milliseconds %d\"\r\n:loop\r\nif \"%%~1\"==\"\" goto end\r\nif \"%%~1\"==\"-o\" (\r\n  copy /Y \"%s\" \"%%~2\" >nul\r\n  shift\r\n)\r\nshift\r\ngoto loop\r\n:end\r\n", delayMs, fixturePath)
+		if err := os.WriteFile(batPath, []byte(script), 0755); err != nil {
+			t.Fatalf("write slow mmdc.bat: %v", err)
+		}
+		return batPath
+	}
+	scriptPath := filepath.Join(dir, "slow-mmdc")
+	sleepArg := fmt.Sprintf("%d.%03d", delayMs/1000, delayMs%1000)
+	script := fmt.Sprintf("#!/bin/sh\nsleep %s\nwhile [ $# -gt 0 ]; do\n  case \"$1\" in\n    -o) shift; cp \"%s\" \"$1\" ;;\n  esac\n  shift\ndone\n",
+		sleepArg, fixturePath)
+	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+		t.Fatalf("write slow mmdc: %v", err)
+	}
+	return scriptPath
+}
 
 func TestProfile_ParallelTimeline(t *testing.T) {
 	if testing.Short() {
@@ -27,7 +52,6 @@ func TestProfile_ParallelTimeline(t *testing.T) {
 
 	cacheDir := t.TempDir()
 
-	// use a wrapper around renderMermaidBlocks that records timestamps
 	epoch := time.Now()
 	type span struct {
 		blockIdx int
@@ -37,23 +61,12 @@ func TestProfile_ParallelTimeline(t *testing.T) {
 	var spans []span
 	var spanMu sync.Mutex
 
-	// we can't easily hook into renderMermaidBlocks, so instead we'll
-	// wrap RenderToFile by timing it from the outside using a custom approach.
-	// Simpler: just measure with the existing renderer and check total time.
-
-	// create a slow mmdc renderer
 	fixturePNG := minimalPNG()
 	scriptDir := t.TempDir()
-	scriptPath := filepath.Join(scriptDir, "slow-mmdc")
-	sleepArg := fmt.Sprintf("%d.%03d", int(delay.Milliseconds())/1000, int(delay.Milliseconds())%1000)
-	script := fmt.Sprintf("#!/bin/sh\nsleep %s\nwhile [ $# -gt 0 ]; do\n  case \"$1\" in\n    -o) shift; cp \"%s\" \"$1\" ;;\n  esac\n  shift\ndone\n",
-		sleepArg, filepath.Join(scriptDir, "fixture.png"))
 	if err := os.WriteFile(filepath.Join(scriptDir, "fixture.png"), fixturePNG, 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
-		t.Fatal(err)
-	}
+	scriptPath := writeSlowMmdc(t, scriptDir, filepath.Join(scriptDir, "fixture.png"), int(delay.Milliseconds()))
 
 	renderer := NewMermaidRenderer(MermaidOptions{MmdcPath: scriptPath, CacheDir: cacheDir})
 	if renderer == nil {
