@@ -37,7 +37,8 @@ done
 		t.Fatalf("write fake mmdc: %v", err)
 	}
 
-	renderer := NewMermaidRenderer(MermaidOptions{MmdcPath: scriptPath})
+	cacheDir := t.TempDir()
+	renderer := NewMermaidRenderer(MermaidOptions{MmdcPath: scriptPath, CacheDir: cacheDir})
 	if renderer == nil {
 		t.Fatal("NewMermaidRenderer returned nil")
 	}
@@ -122,7 +123,8 @@ func TestPreprocessMermaid_ErrorPreservesBlock(t *testing.T) {
 		t.Fatalf("write bad mmdc: %v", err)
 	}
 
-	renderer := NewMermaidRenderer(MermaidOptions{MmdcPath: scriptPath})
+	cacheDir := t.TempDir()
+	renderer := NewMermaidRenderer(MermaidOptions{MmdcPath: scriptPath, CacheDir: cacheDir})
 	if renderer == nil {
 		t.Fatal("NewMermaidRenderer returned nil")
 	}
@@ -156,21 +158,44 @@ func TestMermaidRenderer_Caching(t *testing.T) {
 	}
 }
 
-func TestMermaidRenderer_Close(t *testing.T) {
-	renderer := NewMermaidRenderer(MermaidOptions{MmdcPath: "/bin/echo"})
+func TestMermaidRenderer_Close_PersistentDir(t *testing.T) {
+	persistentDir := t.TempDir()
+
+	renderer := NewMermaidRenderer(MermaidOptions{
+		MmdcPath: "/bin/echo",
+		CacheDir: persistentDir,
+	})
 	if renderer == nil {
 		t.Fatal("NewMermaidRenderer returned nil")
 	}
 
-	cacheDir := renderer.cacheDir
-	if _, err := os.Stat(cacheDir); err != nil {
-		t.Fatalf("cache dir should exist: %v", err)
+	renderer.Close()
+
+	// persistent dir should NOT be removed
+	if _, err := os.Stat(persistentDir); err != nil {
+		t.Error("persistent cache dir should survive Close()")
 	}
+}
+
+func TestMermaidRenderer_Close_TempDir(t *testing.T) {
+	// force temp dir by providing an invalid explicit path and mocking UserCacheDir
+	// We can't easily mock UserCacheDir, so we test the tempDir path directly.
+	renderer := &MermaidRenderer{
+		opts:     MermaidOptions{},
+		mmdcPath: "/bin/echo",
+	}
+
+	td, err := os.MkdirTemp("", "navidown-mermaid-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	renderer.tempDir = td
+	renderer.workDir = td
 
 	renderer.Close()
 
-	if _, err := os.Stat(cacheDir); !os.IsNotExist(err) {
-		t.Error("cache dir should be removed after Close()")
+	if _, err := os.Stat(td); !os.IsNotExist(err) {
+		t.Error("temp dir should be removed after Close()")
 	}
 }
 
@@ -250,4 +275,231 @@ func TestMarkdownSession_MermaidRendersAsImage(t *testing.T) {
 	if !strings.Contains(joined, "[image: mermaid diagram]") {
 		t.Errorf("expected fallback text in output, got:\n%s", joined)
 	}
+}
+
+func TestExtractMermaidBlocks(t *testing.T) {
+	tests := []struct {
+		name       string
+		markdown   string
+		wantCount  int
+		wantSource []string // expected source for each block
+	}{
+		{
+			name:       "single block",
+			markdown:   "```mermaid\ngraph TD\n    A-->B\n```\n",
+			wantCount:  1,
+			wantSource: []string{"graph TD\n    A-->B\n"},
+		},
+		{
+			name:       "multiple blocks",
+			markdown:   "```mermaid\ngraph TD\n```\n\ntext\n\n```mermaid\nsequenceDiagram\n```\n",
+			wantCount:  2,
+			wantSource: []string{"graph TD\n", "sequenceDiagram\n"},
+		},
+		{
+			name:      "unclosed fence",
+			markdown:  "```mermaid\ngraph TD\n    A-->B\n",
+			wantCount: 0,
+		},
+		{
+			name:       "mixed with non-mermaid",
+			markdown:   "```go\nfunc main(){}\n```\n\n```mermaid\ngraph LR\n```\n",
+			wantCount:  1,
+			wantSource: []string{"graph LR\n"},
+		},
+		{
+			name:      "no mermaid blocks",
+			markdown:  "# Title\n\nSome text.\n",
+			wantCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, blocks := extractMermaidBlocks(tt.markdown)
+			if len(blocks) != tt.wantCount {
+				t.Fatalf("got %d blocks, want %d", len(blocks), tt.wantCount)
+			}
+			for i, want := range tt.wantSource {
+				if blocks[i].source != want {
+					t.Errorf("block %d: got source %q, want %q", i, blocks[i].source, want)
+				}
+			}
+		})
+	}
+}
+
+func TestReassembleMermaid(t *testing.T) {
+	t.Run("substitutes rendered blocks", func(t *testing.T) {
+		md := "# Title\n\n```mermaid\ngraph TD\n```\n\nEnd.\n"
+		lines, blocks := extractMermaidBlocks(md)
+		rendered := map[int]string{0: "/tmp/test.png"}
+
+		result := reassembleMermaid(lines, blocks, rendered)
+		if !strings.Contains(result, "![mermaid diagram](/tmp/test.png)") {
+			t.Errorf("expected image substitution, got:\n%s", result)
+		}
+		if !strings.Contains(result, "# Title") {
+			t.Error("title should be preserved")
+		}
+		if !strings.Contains(result, "End.") {
+			t.Error("trailing text should be preserved")
+		}
+	})
+
+	t.Run("preserves block on error", func(t *testing.T) {
+		md := "```mermaid\ngraph TD\n```\n"
+		lines, blocks := extractMermaidBlocks(md)
+		rendered := map[int]string{} // empty = all errors
+
+		result := reassembleMermaid(lines, blocks, rendered)
+		if !strings.Contains(result, "```mermaid") {
+			t.Error("original block should be preserved on error")
+		}
+	})
+
+	t.Run("mixed success and error", func(t *testing.T) {
+		md := "```mermaid\ngraph A\n```\n\n```mermaid\ngraph B\n```\n"
+		lines, blocks := extractMermaidBlocks(md)
+		rendered := map[int]string{0: "/tmp/a.png"} // second block failed
+
+		result := reassembleMermaid(lines, blocks, rendered)
+		if !strings.Contains(result, "![mermaid diagram](/tmp/a.png)") {
+			t.Error("first block should be rendered")
+		}
+		if !strings.Contains(result, "```mermaid") {
+			t.Error("second block should be preserved (error)")
+		}
+	})
+}
+
+func TestMermaidRenderer_DiskCache(t *testing.T) {
+	// set up shared cache dir and fake mmdc
+	fixturePNG := minimalPNG()
+	scriptDir := t.TempDir()
+	scriptPath := filepath.Join(scriptDir, "fake-mmdc")
+	counterPath := filepath.Join(scriptDir, "counter")
+
+	// fake mmdc that increments a counter file on each call
+	script := fmt.Sprintf(`#!/bin/sh
+count=0
+if [ -f "%s" ]; then
+  count=$(cat "%s")
+fi
+count=$((count + 1))
+echo $count > "%s"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) shift; cp "%s" "$1" ;;
+  esac
+  shift
+done
+`, counterPath, counterPath, counterPath, filepath.Join(scriptDir, "fixture.png"))
+
+	if err := os.WriteFile(filepath.Join(scriptDir, "fixture.png"), fixturePNG, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cacheDir := t.TempDir()
+	source := "graph TD\n    A-->B\n"
+
+	// first renderer: renders and writes to disk cache
+	r1 := NewMermaidRenderer(MermaidOptions{MmdcPath: scriptPath, CacheDir: cacheDir})
+	if r1 == nil {
+		t.Fatal("r1 is nil")
+	}
+	path1, err := r1.RenderToFile(source)
+	if err != nil {
+		t.Fatalf("r1 render: %v", err)
+	}
+	r1.Close()
+
+	// second renderer: should find PNG on disk, no mmdc call
+	r2 := NewMermaidRenderer(MermaidOptions{MmdcPath: scriptPath, CacheDir: cacheDir})
+	if r2 == nil {
+		t.Fatal("r2 is nil")
+	}
+	path2, err := r2.RenderToFile(source)
+	if err != nil {
+		t.Fatalf("r2 render: %v", err)
+	}
+	r2.Close()
+
+	if path1 != path2 {
+		t.Errorf("paths differ: %q vs %q", path1, path2)
+	}
+
+	// counter should be 1 — mmdc was only called once
+	data, err := os.ReadFile(counterPath)
+	if err != nil {
+		t.Fatalf("read counter: %v", err)
+	}
+	if strings.TrimSpace(string(data)) != "1" {
+		t.Errorf("mmdc was called %s times, expected 1", strings.TrimSpace(string(data)))
+	}
+}
+
+func TestMermaidRenderer_CacheKeyIncludesOptions(t *testing.T) {
+	r1 := &MermaidRenderer{opts: MermaidOptions{Theme: "dark"}}
+	r2 := &MermaidRenderer{opts: MermaidOptions{Theme: "forest"}}
+
+	source := "graph TD\n    A-->B\n"
+	k1 := r1.cacheKey(source)
+	k2 := r2.cacheKey(source)
+
+	if k1 == k2 {
+		t.Error("different themes should produce different cache keys")
+	}
+
+	// same options = same key
+	r3 := &MermaidRenderer{opts: MermaidOptions{Theme: "dark"}}
+	k3 := r3.cacheKey(source)
+	if k1 != k3 {
+		t.Error("same options should produce same cache key")
+	}
+}
+
+func TestResolveCacheDir(t *testing.T) {
+	t.Run("explicit path", func(t *testing.T) {
+		dir := filepath.Join(t.TempDir(), "explicit")
+		persistent, temp, work := resolveCacheDir(dir)
+		if persistent != dir {
+			t.Errorf("persistentDir: got %q, want %q", persistent, dir)
+		}
+		if temp != "" {
+			t.Errorf("tempDir should be empty for explicit path, got %q", temp)
+		}
+		if work != dir {
+			t.Errorf("workDir: got %q, want %q", work, dir)
+		}
+		// dir should exist
+		if _, err := os.Stat(dir); err != nil {
+			t.Errorf("explicit dir should have been created: %v", err)
+		}
+	})
+
+	t.Run("auto path (empty string)", func(t *testing.T) {
+		persistent, temp, work := resolveCacheDir("")
+		// should succeed with either persistent or temp
+		if work == "" {
+			t.Fatal("resolveCacheDir should find a usable dir")
+		}
+		if persistent != "" {
+			// persistent path should contain navidown/mermaid
+			if !strings.Contains(persistent, filepath.Join("navidown", "mermaid")) {
+				t.Errorf("persistent dir should contain navidown/mermaid: %q", persistent)
+			}
+			if temp != "" {
+				t.Error("temp should be empty when persistent succeeds")
+			}
+		} else {
+			// fell back to temp
+			if temp == "" {
+				t.Error("if no persistent, temp should be set")
+			}
+		}
+	})
 }
