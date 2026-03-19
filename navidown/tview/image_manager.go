@@ -161,6 +161,12 @@ func (m *ImageManager) DetectSupport(screen tcell.Screen) {
 	m.SetSupported(true)
 }
 
+// PreResolveImages resolves multiple image URLs in parallel, warming the cache.
+// Subsequent ResolveAndAllocate calls for these URLs will be fast cache hits.
+func (m *ImageManager) PreResolveImages(urls []string, sourceFilePath string) {
+	m.resolver.PreResolve(urls, sourceFilePath)
+}
+
 // ResolveAndAllocate resolves an image URL and assigns it a Kitty image ID.
 // Returns the ImagePlaceholder with dimensions calculated for the given viewport width.
 func (m *ImageManager) ResolveAndAllocate(url, sourceFilePath string, maxCols int) (*nav.ImagePlaceholder, error) {

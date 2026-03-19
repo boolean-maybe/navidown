@@ -18,12 +18,20 @@ func NewKittyImageProcessor(manager *ImageManager) *KittyImageProcessor {
 }
 
 // ProcessImageTokens scans lines for image tokens and replaces them with
-// Kitty Unicode placeholder rows.
+// Kitty Unicode placeholder rows. Images are pre-resolved in parallel before
+// sequential placeholder generation.
 func (p *KittyImageProcessor) ProcessImageTokens(lines []string, sourceFilePath string, maxCols int) []string {
 	if maxCols <= 0 {
 		maxCols = 80
 	}
 
+	// first pass: collect all image URLs for parallel pre-resolution
+	urls := p.collectImageURLs(lines)
+	if len(urls) > 0 {
+		p.manager.PreResolveImages(urls, sourceFilePath)
+	}
+
+	// second pass: build output lines (resolver cache is warm)
 	result := make([]string, 0, len(lines))
 	for _, line := range lines {
 		if !nav.ContainsImageToken(line) {
@@ -31,11 +39,40 @@ func (p *KittyImageProcessor) ProcessImageTokens(lines []string, sourceFilePath 
 			continue
 		}
 
-		// Process the line, potentially expanding into multiple lines
 		expanded := p.processLine(line, sourceFilePath, maxCols)
 		result = append(result, expanded...)
 	}
 	return result
+}
+
+// collectImageURLs extracts all image URLs from token-bearing lines.
+func (p *KittyImageProcessor) collectImageURLs(lines []string) []string {
+	var urls []string
+	seen := make(map[string]bool)
+	for _, line := range lines {
+		if !nav.ContainsImageToken(line) {
+			continue
+		}
+		remaining := line
+		for {
+			startIdx := findTokenStart(remaining)
+			if startIdx < 0 {
+				break
+			}
+			endIdx := findTokenEnd(remaining[startIdx:])
+			if endIdx < 0 {
+				break
+			}
+			endIdx += startIdx
+			token := remaining[startIdx:endIdx]
+			if url, _, ok := nav.ParseImageToken(token); ok && !seen[url] {
+				seen[url] = true
+				urls = append(urls, url)
+			}
+			remaining = remaining[endIdx:]
+		}
+	}
+	return urls
 }
 
 func (p *KittyImageProcessor) processLine(line string, sourceFilePath string, maxCols int) []string {

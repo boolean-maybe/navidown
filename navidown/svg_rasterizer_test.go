@@ -80,14 +80,16 @@ func make1x1PNG() []byte {
 }
 
 type mockSVGRasterizer struct {
-	called  bool
-	width   int
-	pngData []byte
-	err     error
+	called    bool
+	callCount int
+	width     int
+	pngData   []byte
+	err       error
 }
 
 func (m *mockSVGRasterizer) Rasterize(_ []byte, targetWidth int) ([]byte, error) {
 	m.called = true
+	m.callCount++
 	m.width = targetWidth
 	return m.pngData, m.err
 }
@@ -172,6 +174,143 @@ func TestImageResolver_SVG_RasterizerError(t *testing.T) {
 	}
 	if !mock.called {
 		t.Fatal("expected mock rasterizer to be called")
+	}
+}
+
+func TestCachingSVGRasterizer_DiskCache(t *testing.T) {
+	pngBytes := make1x1PNG()
+	mock := &mockSVGRasterizer{pngData: pngBytes}
+	cacheDir := t.TempDir()
+
+	c := NewCachingSVGRasterizer(mock, cacheDir)
+	if c == nil {
+		t.Fatal("NewCachingSVGRasterizer returned nil")
+	}
+
+	svgData := []byte(`<svg xmlns="http://www.w3.org/2000/svg"></svg>`)
+
+	// first call: should invoke inner rasterizer
+	result1, err := c.Rasterize(svgData, 200)
+	if err != nil {
+		t.Fatalf("first Rasterize: %v", err)
+	}
+	if !mock.called {
+		t.Fatal("expected inner rasterizer to be called")
+	}
+	if mock.callCount != 1 {
+		t.Errorf("call count = %d, want 1", mock.callCount)
+	}
+
+	// verify disk file was written
+	key := svgCacheKey(svgData, 200)
+	diskPath := filepath.Join(cacheDir, key+".png")
+	if _, err := os.Stat(diskPath); err != nil {
+		t.Fatalf("disk cache file not found: %v", err)
+	}
+
+	// second call: should hit in-memory cache, no additional inner call
+	result2, err := c.Rasterize(svgData, 200)
+	if err != nil {
+		t.Fatalf("second Rasterize: %v", err)
+	}
+	if mock.callCount != 1 {
+		t.Errorf("call count = %d after in-memory cache hit, want 1", mock.callCount)
+	}
+	if !bytes.Equal(result1, result2) {
+		t.Error("results differ between first and cached call")
+	}
+
+	// new instance with same cache dir: should hit disk cache
+	mock2 := &mockSVGRasterizer{pngData: pngBytes}
+	c2 := NewCachingSVGRasterizer(mock2, cacheDir)
+	if c2 == nil {
+		t.Fatal("c2 is nil")
+	}
+
+	result3, err := c2.Rasterize(svgData, 200)
+	if err != nil {
+		t.Fatalf("disk cache Rasterize: %v", err)
+	}
+	if mock2.callCount != 0 {
+		t.Errorf("inner rasterizer called %d times on disk cache hit, want 0", mock2.callCount)
+	}
+	if !bytes.Equal(result1, result3) {
+		t.Error("disk-cached result differs from original")
+	}
+}
+
+func TestCachingSVGRasterizer_Close(t *testing.T) {
+	pngBytes := make1x1PNG()
+	mock := &mockSVGRasterizer{pngData: pngBytes}
+
+	// force temp dir by creating the caching rasterizer with workDir set to a temp dir
+	c := &CachingSVGRasterizer{inner: mock}
+	td, err := os.MkdirTemp("", "navidown-svg-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.tempDir = td
+	c.workDir = td
+
+	c.Close()
+
+	if _, err := os.Stat(td); !os.IsNotExist(err) {
+		t.Error("temp dir should be removed after Close()")
+	}
+}
+
+func TestCachingSVGRasterizer_DifferentWidths(t *testing.T) {
+	pngBytes := make1x1PNG()
+	mock := &mockSVGRasterizer{pngData: pngBytes}
+	cacheDir := t.TempDir()
+
+	c := NewCachingSVGRasterizer(mock, cacheDir)
+	if c == nil {
+		t.Fatal("nil")
+	}
+
+	svgData := []byte(`<svg xmlns="http://www.w3.org/2000/svg"></svg>`)
+
+	if _, err := c.Rasterize(svgData, 200); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Rasterize(svgData, 400); err != nil {
+		t.Fatal(err)
+	}
+
+	// should have called inner twice (different cache keys)
+	if mock.callCount != 2 {
+		t.Errorf("call count = %d, want 2 (different widths)", mock.callCount)
+	}
+}
+
+func TestImageResolver_PreResolve(t *testing.T) {
+	dir := t.TempDir()
+	pngBytes := make1x1PNG()
+
+	// write multiple image files
+	for _, name := range []string{"a.png", "b.png", "c.png"} {
+		if err := os.WriteFile(filepath.Join(dir, name), pngBytes, 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	resolver := NewImageResolver([]string{dir})
+	sourceFile := filepath.Join(dir, "doc.md")
+
+	// pre-resolve all
+	resolver.PreResolve([]string{"a.png", "b.png", "c.png"}, sourceFile)
+
+	// verify all are cached (Resolve should return immediately with no error)
+	for _, name := range []string{"a.png", "b.png", "c.png"} {
+		info, err := resolver.Resolve(name, sourceFile)
+		if err != nil {
+			t.Errorf("Resolve(%q) after PreResolve: %v", name, err)
+			continue
+		}
+		if info == nil {
+			t.Errorf("Resolve(%q) returned nil info", name)
+		}
 	}
 }
 

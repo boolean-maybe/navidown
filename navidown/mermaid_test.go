@@ -541,7 +541,7 @@ func TestMermaidRenderer_CacheKeyIncludesOptions(t *testing.T) {
 func TestResolveCacheDir(t *testing.T) {
 	t.Run("explicit path", func(t *testing.T) {
 		dir := filepath.Join(t.TempDir(), "explicit")
-		persistent, temp, work := resolveCacheDir(dir)
+		persistent, temp, work := resolveCacheDir(dir, "mermaid")
 		if persistent != dir {
 			t.Errorf("persistentDir: got %q, want %q", persistent, dir)
 		}
@@ -558,7 +558,7 @@ func TestResolveCacheDir(t *testing.T) {
 	})
 
 	t.Run("auto path (empty string)", func(t *testing.T) {
-		persistent, temp, work := resolveCacheDir("")
+		persistent, temp, work := resolveCacheDir("", "mermaid")
 		// should succeed with either persistent or temp
 		if work == "" {
 			t.Fatal("resolveCacheDir should find a usable dir")

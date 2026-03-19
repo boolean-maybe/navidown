@@ -72,7 +72,7 @@ func NewMermaidRenderer(opts MermaidOptions) *MermaidRenderer {
 		mmdcPath = resolved
 	}
 
-	persistentDir, tempDir, workDir := resolveCacheDir(opts.CacheDir)
+	persistentDir, tempDir, workDir := resolveCacheDir(opts.CacheDir, "mermaid")
 	if workDir == "" {
 		return nil
 	}
@@ -84,30 +84,6 @@ func NewMermaidRenderer(opts MermaidOptions) *MermaidRenderer {
 		workDir:       workDir,
 		mmdcPath:      mmdcPath,
 	}
-}
-
-// resolveCacheDir determines which directory to use for mermaid PNG caching.
-// It tries (in order): explicit path, os.UserCacheDir()/navidown/mermaid, temp dir.
-// Returns (persistentDir, tempDir, workDir). workDir is the dir to actually use.
-func resolveCacheDir(explicit string) (persistentDir, tempDir, workDir string) {
-	if explicit != "" {
-		if err := os.MkdirAll(explicit, 0700); err == nil {
-			return explicit, "", explicit
-		}
-	}
-
-	if ucd, err := os.UserCacheDir(); err == nil {
-		dir := filepath.Join(ucd, "navidown", "mermaid")
-		if err := os.MkdirAll(dir, 0700); err == nil {
-			return dir, "", dir
-		}
-	}
-
-	if td, err := os.MkdirTemp("", "navidown-mermaid-"); err == nil {
-		return "", td, td
-	}
-
-	return "", "", ""
 }
 
 // cacheKey computes a hash incorporating the mermaid source and render options

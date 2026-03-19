@@ -78,16 +78,57 @@ func (r *ImageResolver) Resolve(url string, sourceFilePath string) (*ImageInfo, 
 	return info, nil
 }
 
+// PreResolve resolves multiple image URLs in parallel, populating the cache.
+// Errors are silently ignored — individual Resolve calls will re-attempt.
+func (r *ImageResolver) PreResolve(urls []string, sourceFilePath string) {
+	if len(urls) == 0 {
+		return
+	}
+
+	var wg sync.WaitGroup
+	for _, u := range urls {
+		// skip already-cached URLs
+		if _, ok := r.cache.Load(u); ok {
+			continue
+		}
+		wg.Add(1)
+		go func(url string) {
+			defer wg.Done()
+			_, _ = r.Resolve(url, sourceFilePath)
+		}(u)
+	}
+	wg.Wait()
+}
+
+// Close releases resources held by the resolver (e.g. caching rasterizer temp dirs).
+func (r *ImageResolver) Close() {
+	if c, ok := r.svgRasterizer.(*CachingSVGRasterizer); ok {
+		c.Close()
+	}
+}
+
 func (r *ImageResolver) rasterizeSVG(data []byte) ([]byte, error) {
 	rast := r.svgRasterizer
 	if rast == nil {
-		rast = &ResvgRasterizer{}
+		rast = r.defaultRasterizer()
 	}
 	width := r.svgRasterWidth
 	if width <= 0 {
 		width = defaultSVGRasterWidth
 	}
 	return rast.Rasterize(data, width)
+}
+
+// defaultRasterizer creates and caches a CachingSVGRasterizer (or falls back to bare ResvgRasterizer).
+func (r *ImageResolver) defaultRasterizer() SVGRasterizer {
+	rast := NewCachingSVGRasterizer(&ResvgRasterizer{}, "")
+	if rast != nil {
+		r.svgRasterizer = rast
+		return rast
+	}
+	bare := &ResvgRasterizer{}
+	r.svgRasterizer = bare
+	return bare
 }
 
 func (r *ImageResolver) fetchImageBytes(url string, sourceFilePath string) ([]byte, error) {
