@@ -203,7 +203,7 @@ func (e *CodeBlockElement) Render(w io.Writer, ctx RenderContext) error {
 		mutex.Unlock()
 	}
 
-	width := int(bs.Width(ctx))
+	width := int(bs.Width(ctx)) //nolint:gosec // terminal width is structurally bounded
 
 	// resolve background color for the code block
 	bgColor := resolveCodeBlockBg(rules, profile)
@@ -227,7 +227,7 @@ func (e *CodeBlockElement) Render(w io.Writer, ctx RenderContext) error {
 		innerWidth = width - 2
 	}
 
-	marginPrefix := strings.Repeat(" ", int(indentation+margin))
+	marginPrefix := strings.Repeat(" ", int(indentation+margin)) //nolint:gosec // terminal indent is structurally bounded
 
 	if hasBorders {
 		topBorder := buildBorder("╭", "╮", e.Language, width)
@@ -243,9 +243,9 @@ func (e *CodeBlockElement) Render(w io.Writer, ctx RenderContext) error {
 		renderText(&codeBuf, profile, bs.Current().Style.StylePrimitive, " ")
 	})
 
-	// strip trailing newline from code — it's a markdown parsing artifact
+	// strip trailing newlines from code — it's a markdown parsing artifact
 	// and would create an empty bordered line at the end
-	code := strings.TrimRight(e.Code, "\n")
+	code := strings.TrimRight(e.Code, "\r\n")
 	// replace tabs with spaces — tabs cause width miscalculation in padding
 	code = strings.ReplaceAll(code, "\t", "    ")
 
@@ -280,6 +280,7 @@ func (e *CodeBlockElement) Render(w io.Writer, ctx RenderContext) error {
 		codeOutput = strings.ReplaceAll(codeOutput, ansiFullReset, ansiFgAttrReset)
 	}
 
+	codeOutput = strings.ReplaceAll(codeOutput, "\r\n", "\n")
 	lines := strings.Split(strings.TrimRight(codeOutput, "\n"), "\n")
 	writeCodeLines(w, lines, innerWidth, marginPrefix, bgEscape, hasBorders, profile, borderStyle)
 
