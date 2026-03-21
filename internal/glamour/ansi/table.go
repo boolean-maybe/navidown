@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
+	xansi "github.com/charmbracelet/x/ansi"
 	"github.com/muesli/reflow/indent"
 	astext "github.com/yuin/goldmark/extension/ast"
 )
@@ -18,6 +20,7 @@ type TableElement struct {
 	header   []string
 	row      []string
 	source   []byte
+	maxWidth int
 
 	tableImages []tableLink
 	tableLinks  []tableLink
@@ -57,13 +60,13 @@ func (e *TableElement) Render(w io.Writer, ctx RenderContext) error {
 
 	renderText(iw, ctx.options.ColorProfile, bs.Current().Style.StylePrimitive, rules.BlockPrefix)
 	renderText(iw, ctx.options.ColorProfile, style, rules.Prefix)
-	width := int(ctx.blockStack.Width(ctx)) //nolint: gosec
+	ctx.table.maxWidth = int(ctx.blockStack.Width(ctx)) //nolint: gosec
 
 	wrap := true
 	if ctx.options.TableWrap != nil {
 		wrap = *ctx.options.TableWrap
 	}
-	ctx.table.lipgloss = table.New().Width(width).Wrap(wrap)
+	ctx.table.lipgloss = table.New().Wrap(wrap)
 
 	if err := e.collectLinksAndImages(ctx); err != nil {
 		return err
@@ -130,8 +133,17 @@ func (e *TableElement) Finish(_ io.Writer, ctx RenderContext) error {
 	e.setStyles(ctx)
 	e.setBorders(ctx)
 
+	// render without width constraint first to get natural column sizing
+	rendered := ctx.table.lipgloss.String()
+
+	// if natural width exceeds available width, re-render with constraint
+	if naturalWidth(rendered) > ctx.table.maxWidth {
+		ctx.table.lipgloss.Width(ctx.table.maxWidth)
+		rendered = ctx.table.lipgloss.String()
+	}
+
 	ow := ctx.blockStack.Current().Block
-	if _, err := ow.WriteString(ctx.table.lipgloss.String()); err != nil {
+	if _, err := ow.WriteString(rendered); err != nil {
 		return fmt.Errorf("glamour: error writing to buffer: %w", err)
 	}
 
@@ -141,6 +153,17 @@ func (e *TableElement) Finish(_ io.Writer, ctx RenderContext) error {
 	e.printTableLinks(ctx)
 
 	return nil
+}
+
+// naturalWidth returns the maximum visible line width of a rendered table string.
+func naturalWidth(rendered string) int {
+	maxW := 0
+	for _, line := range strings.Split(rendered, "\n") {
+		if w := xansi.StringWidth(line); w > maxW {
+			maxW = w
+		}
+	}
+	return maxW
 }
 
 // Finish finishes rendering a TableRowElement.
