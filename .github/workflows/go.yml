@@ -33,7 +33,11 @@ jobs:
 
     - name: Run tests
       shell: bash
-      run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+      run: |
+        # collect coverage only for packages that have test files to avoid
+        # "go: no such tool covdata" errors on Go 1.24+ for testless packages
+        go test -v -race -coverprofile=coverage.out -covermode=atomic \
+          $(go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./...)
 
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.24.x'
