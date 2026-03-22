@@ -11,6 +11,10 @@ import (
 	"net/http"
 	"os"
 	"sync"
+
+	_ "golang.org/x/image/bmp"  // Register BMP decoder
+	_ "golang.org/x/image/tiff" // Register TIFF decoder
+	_ "golang.org/x/image/webp" // Register WebP decoder
 )
 
 // ImageInfo holds decoded image metadata and raw bytes.
