@@ -74,6 +74,9 @@ type MarkdownSession struct {
 
 	// mermaid support
 	mermaidRenderer *MermaidRenderer
+
+	// graphviz support
+	graphvizRenderer *GraphvizRenderer
 }
 
 // Options configures a markdownSession.
@@ -93,6 +96,11 @@ type Options struct {
 	// inserted as images into the markdown before parsing/rendering.
 	// If mmdc is not found, mermaid support is silently disabled.
 	MermaidOptions *MermaidOptions
+	// GraphvizOptions, when non-nil, enables graphviz diagram rendering.
+	// Fenced code blocks tagged "dot" or "graphviz" are pre-rendered to
+	// PNG via the dot CLI and inserted as images before parsing/rendering.
+	// If dot is not found, graphviz support is silently disabled.
+	GraphvizOptions *GraphvizOptions
 }
 
 // New creates a new markdownSession.
@@ -116,6 +124,12 @@ func New(opts Options) *MarkdownSession {
 		// mermaid is nil if mmdc not found — silent degradation
 	}
 
+	var graphviz *GraphvizRenderer
+	if opts.GraphvizOptions != nil {
+		graphviz = NewGraphvizRenderer(*opts.GraphvizOptions)
+		// graphviz is nil if dot not found — silent degradation
+	}
+
 	return &MarkdownSession{
 		selectedIndex:        -1,
 		scrollOffset:         0,
@@ -125,13 +139,17 @@ func New(opts Options) *MarkdownSession {
 		alwaysScrollToAnchor: opts.AlwaysScrollToAnchor,
 		imagePostProcessor:   opts.ImagePostProcessor,
 		mermaidRenderer:      mermaid,
+		graphvizRenderer:     graphviz,
 	}
 }
 
-// Close releases resources held by the session (e.g., mermaid temp files).
+// Close releases resources held by the session (e.g., mermaid/graphviz temp files).
 func (v *MarkdownSession) Close() {
 	if v.mermaidRenderer != nil {
 		v.mermaidRenderer.Close()
+	}
+	if v.graphvizRenderer != nil {
+		v.graphvizRenderer.Close()
 	}
 }
 
@@ -145,6 +163,19 @@ func (v *MarkdownSession) SetMermaidOptions(opts *MermaidOptions) {
 	}
 	if opts != nil {
 		v.mermaidRenderer = NewMermaidRenderer(*opts)
+	}
+}
+
+// SetGraphvizOptions enables or disables graphviz diagram rendering.
+// Pass nil to disable. If dot is not found, graphviz is silently disabled.
+// Closes any existing graphviz renderer before replacing it.
+func (v *MarkdownSession) SetGraphvizOptions(opts *GraphvizOptions) {
+	if v.graphvizRenderer != nil {
+		v.graphvizRenderer.Close()
+		v.graphvizRenderer = nil
+	}
+	if opts != nil {
+		v.graphvizRenderer = NewGraphvizRenderer(*opts)
 	}
 }
 
@@ -354,7 +385,8 @@ func (v *MarkdownSession) elementsMatch(e1, e2 *NavElement) bool {
 }
 
 func (v *MarkdownSession) preprocessForRender(markdown string) string {
-	return preprocessMermaid(markdown, v.mermaidRenderer)
+	result := preprocessMermaid(markdown, v.mermaidRenderer)
+	return preprocessGraphviz(result, v.graphvizRenderer)
 }
 
 // SetMarkdown loads markdown. If pushToHistory is true, it stores the current page in back history first.

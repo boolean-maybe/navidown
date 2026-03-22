@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"sync"
 	"time"
 )
@@ -159,124 +158,16 @@ func (r *MermaidRenderer) Close() {
 // mermaidFenceRe matches the opening of a mermaid fenced code block.
 var mermaidFenceRe = regexp.MustCompile("^(\\s*`{3,})mermaid\\s*$")
 
-// mermaidBlock represents a parsed mermaid code block from markdown.
-type mermaidBlock struct {
-	source    string
-	openLine  int // first line of ```mermaid fence
-	closeLine int // line after closing fence (exclusive)
-}
-
 // extractMermaidBlocks scans markdown lines for ```mermaid fences and returns
 // the split lines along with the identified blocks (source + positions).
-func extractMermaidBlocks(markdown string) ([]string, []mermaidBlock) {
-	lines := strings.Split(markdown, "\n")
-	var blocks []mermaidBlock
-
-	i := 0
-	for i < len(lines) {
-		match := mermaidFenceRe.FindStringSubmatch(lines[i])
-		if match == nil {
-			i++
-			continue
-		}
-
-		fencePrefix := match[1]
-		backticks := strings.TrimLeft(fencePrefix, " \t")
-		fenceLen := len(backticks)
-		openLine := i
-		i++
-
-		var source strings.Builder
-		closed := false
-		for i < len(lines) {
-			trimmed := strings.TrimLeft(lines[i], " \t")
-			if len(trimmed) >= fenceLen && strings.TrimRight(trimmed, "`") == "" && countLeadingBackticks(trimmed) >= fenceLen {
-				i++
-				closed = true
-				break
-			}
-			source.WriteString(lines[i])
-			source.WriteByte('\n')
-			i++
-		}
-
-		if closed {
-			blocks = append(blocks, mermaidBlock{
-				source:    source.String(),
-				openLine:  openLine,
-				closeLine: i,
-			})
-		}
-		// unclosed fences are simply not collected — they stay as-is
-	}
-
-	return lines, blocks
-}
-
-// renderMermaidBlocks renders all blocks in parallel and returns a map of
-// block index → PNG path. Missing entries indicate render errors.
-func renderMermaidBlocks(blocks []mermaidBlock, renderer *MermaidRenderer) map[int]string {
-	results := make(map[int]string)
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-
-	for idx, block := range blocks {
-		wg.Add(1)
-		go func(idx int, source string) {
-			defer wg.Done()
-			pngPath, err := renderer.RenderToFile(source)
-			if err != nil {
-				return
-			}
-			mu.Lock()
-			results[idx] = pngPath
-			mu.Unlock()
-		}(idx, block.source)
-	}
-
-	wg.Wait()
-	return results
+func extractMermaidBlocks(markdown string) ([]string, []diagramBlock) {
+	return extractDiagramBlocks(markdown, mermaidFenceRe)
 }
 
 // reassembleMermaid rebuilds markdown from lines, substituting rendered blocks.
 // Blocks missing from the rendered map are preserved as original fenced code.
-func reassembleMermaid(lines []string, blocks []mermaidBlock, rendered map[int]string) string {
-	var result strings.Builder
-	result.Grow(len(lines) * 40) // rough estimate
-
-	blockIdx := 0
-	i := 0
-	for i < len(lines) {
-		// check if current line is the start of the next block
-		if blockIdx < len(blocks) && i == blocks[blockIdx].openLine {
-			block := blocks[blockIdx]
-			if pngPath, ok := rendered[blockIdx]; ok {
-				result.WriteString("![mermaid diagram](" + pngPath + ")")
-				if block.closeLine < len(lines) {
-					result.WriteByte('\n')
-				}
-			} else {
-				// render error — preserve original lines
-				for j := block.openLine; j < block.closeLine; j++ {
-					result.WriteString(lines[j])
-					if j < len(lines)-1 {
-						result.WriteByte('\n')
-					}
-				}
-			}
-			i = block.closeLine
-			blockIdx++
-			continue
-		}
-
-		result.WriteString(lines[i])
-		if i < len(lines)-1 {
-			result.WriteByte('\n')
-		}
-		i++
-	}
-
-	return result.String()
+func reassembleMermaid(lines []string, blocks []diagramBlock, rendered map[int]string) string {
+	return reassembleDiagram(lines, blocks, rendered, "mermaid diagram")
 }
 
 // preprocessMermaid scans raw markdown for ```mermaid blocks and replaces them
@@ -287,23 +178,11 @@ func preprocessMermaid(markdown string, renderer *MermaidRenderer) string {
 		return markdown
 	}
 
-	lines, blocks := extractMermaidBlocks(markdown)
+	lines, blocks := extractDiagramBlocks(markdown, mermaidFenceRe)
 	if len(blocks) == 0 {
 		return markdown
 	}
 
-	rendered := renderMermaidBlocks(blocks, renderer)
-	return reassembleMermaid(lines, blocks, rendered)
-}
-
-func countLeadingBackticks(s string) int {
-	count := 0
-	for _, ch := range s {
-		if ch == '`' {
-			count++
-		} else {
-			break
-		}
-	}
-	return count
+	rendered := renderDiagramBlocks(blocks, renderer)
+	return reassembleDiagram(lines, blocks, rendered, "mermaid diagram")
 }

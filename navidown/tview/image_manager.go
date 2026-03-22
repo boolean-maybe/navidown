@@ -59,12 +59,12 @@ func NewImageManager(resolver *nav.ImageResolver, cellWidth, cellHeight int) *Im
 		resolver:    resolver,
 		cellWidth:   cellWidth,
 		cellHeight:  cellHeight,
-		maxRows:     20,
+		maxRows:     0,
 	}
 }
 
 // SetMaxRows sets the maximum number of terminal rows an image can occupy.
-// Use 0 for no limit. Default is 20.
+// Use 0 for no limit. Default is 0 (no limit).
 func (m *ImageManager) SetMaxRows(maxRows int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

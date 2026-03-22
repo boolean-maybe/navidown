@@ -73,6 +73,7 @@ func (v *TextViewViewer) Core() *nav.MarkdownSession { return v.core }
 // When set, images in markdown will be rendered as Unicode placeholders.
 func (v *TextViewViewer) SetImageManager(m *ImageManager) *TextViewViewer {
 	v.imageManager = m
+	v.imageManager.SetMaxRows(40)
 	v.core.SetImagePostProcessor(NewKittyImageProcessor(m))
 	return v
 }

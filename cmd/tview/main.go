@@ -50,6 +50,9 @@ func main() {
 	// enable mermaid diagram rendering (requires mmdc in PATH)
 	mdViewer.Core().SetMermaidOptions(&navidown.MermaidOptions{Theme: "dark"})
 
+	// enable graphviz diagram rendering (requires dot in PATH)
+	mdViewer.Core().SetGraphvizOptions(&navidown.GraphvizOptions{})
+
 	// set up content fetcher for link navigation
 	provider := &loaders.FileHTTP{SearchRoots: []string{"."}}
 
