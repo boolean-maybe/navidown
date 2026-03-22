@@ -89,6 +89,82 @@ func TestDetectStyleFromEnvironment(t *testing.T) {
 	}
 }
 
+func TestWithCodeTheme(t *testing.T) {
+	original := NewANSIRenderer()
+	modified := original.WithCodeTheme("dracula")
+
+	if modified.glamourStyle.CodeBlock.Theme != "dracula" {
+		t.Errorf("expected Theme=dracula, got %q", modified.glamourStyle.CodeBlock.Theme)
+	}
+	if modified.glamourStyle.CodeBlock.Chroma != nil {
+		t.Error("expected Chroma=nil after WithCodeTheme")
+	}
+
+	// original unchanged
+	if original.glamourStyle.CodeBlock.Theme == "dracula" {
+		t.Error("WithCodeTheme mutated the original renderer")
+	}
+}
+
+func TestWithCodeBackground(t *testing.T) {
+	original := NewANSIRenderer()
+	modified := original.WithCodeBackground("#282a36")
+
+	if modified.glamourStyle.CodeBlock.BackgroundColor == nil || *modified.glamourStyle.CodeBlock.BackgroundColor != "#282a36" {
+		t.Errorf("expected BackgroundColor=#282a36, got %v", modified.glamourStyle.CodeBlock.BackgroundColor)
+	}
+
+	// original unchanged
+	if original.glamourStyle.CodeBlock.BackgroundColor != nil && *original.glamourStyle.CodeBlock.BackgroundColor == "#282a36" {
+		t.Error("WithCodeBackground mutated the original renderer")
+	}
+}
+
+func TestWithCodeBorder(t *testing.T) {
+	original := NewANSIRenderer()
+	modified := original.WithCodeBorder("#6272a4")
+
+	if modified.glamourStyle.CodeBlock.Color == nil || *modified.glamourStyle.CodeBlock.Color != "#6272a4" {
+		t.Errorf("expected Color=#6272a4, got %v", modified.glamourStyle.CodeBlock.Color)
+	}
+
+	// original unchanged
+	if original.glamourStyle.CodeBlock.Color != nil && *original.glamourStyle.CodeBlock.Color == "#6272a4" {
+		t.Error("WithCodeBorder mutated the original renderer")
+	}
+}
+
+func TestWithCodeChaining(t *testing.T) {
+	base := NewANSIRenderer().WithWordWrap(80)
+	result := base.WithCodeTheme("monokai").WithCodeBackground("#1e1e1e").WithCodeBorder("#444")
+
+	if result.glamourStyle.CodeBlock.Theme != "monokai" {
+		t.Errorf("expected Theme=monokai, got %q", result.glamourStyle.CodeBlock.Theme)
+	}
+	if result.glamourStyle.CodeBlock.BackgroundColor == nil || *result.glamourStyle.CodeBlock.BackgroundColor != "#1e1e1e" {
+		t.Error("expected BackgroundColor=#1e1e1e")
+	}
+	if result.glamourStyle.CodeBlock.Color == nil || *result.glamourStyle.CodeBlock.Color != "#444" {
+		t.Error("expected Color=#444")
+	}
+	if result.wordWrap != 80 {
+		t.Errorf("expected wordWrap=80 preserved through chain, got %d", result.wordWrap)
+	}
+}
+
+func TestNewANSIRendererWithStyle_RegisteredStyle(t *testing.T) {
+	renderer := NewANSIRendererWithStyle("dracula")
+	if renderer == nil {
+		t.Fatal("NewANSIRendererWithStyle returned nil for registered style")
+	}
+
+	// dracula should differ from dark in at least the document color
+	dark := NewANSIRendererWithStyle("dark")
+	if renderer.glamourStyle.Document.Color == dark.glamourStyle.Document.Color {
+		t.Error("dracula style should differ from dark style")
+	}
+}
+
 func TestNewANSIRendererBackwardsCompatibility(t *testing.T) {
 	// NewANSIRenderer should behave exactly like NewANSIRendererWithStyle("dark")
 	r1 := NewANSIRenderer()

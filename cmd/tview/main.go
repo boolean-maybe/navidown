@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,13 +16,22 @@ import (
 )
 
 func main() {
-	// parse arguments
-	if len(os.Args) < 2 {
-		fmt.Fprintf(os.Stderr, "usage: %s <file-path-or-url>\n", os.Args[0])
+	// parse flags
+	syntaxTheme := flag.String("syntax-theme", "", "chroma style name for code block syntax highlighting (e.g. dracula, monokai, catppuccin-macchiato)")
+	syntaxBg := flag.String("syntax-background", "", "background color for code blocks (e.g. #282a36, 236)")
+	syntaxBorder := flag.String("syntax-border", "", "border color for code blocks (e.g. #6272a4, 244)")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "usage: %s [flags] <file-path-or-url>\n\nflags:\n", os.Args[0])
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+
+	if flag.NArg() < 1 {
+		flag.Usage()
 		os.Exit(1)
 	}
 
-	arg := os.Args[1]
+	arg := flag.Arg(0)
 
 	// load initial content
 	content, sourcePath, err := loadContent(arg)
@@ -46,6 +56,21 @@ func main() {
 	imgManager.SetMaxRows(40)
 	imgManager.SetSupported(true)
 	mdViewer.SetImageManager(imgManager)
+
+	// apply syntax highlighting overrides if specified
+	if *syntaxTheme != "" || *syntaxBg != "" || *syntaxBorder != "" {
+		renderer := navidown.NewANSIRenderer()
+		if *syntaxTheme != "" {
+			renderer = renderer.WithCodeTheme(*syntaxTheme)
+		}
+		if *syntaxBg != "" {
+			renderer = renderer.WithCodeBackground(*syntaxBg)
+		}
+		if *syntaxBorder != "" {
+			renderer = renderer.WithCodeBorder(*syntaxBorder)
+		}
+		mdViewer.Core().SetRenderer(renderer)
+	}
 
 	// enable mermaid diagram rendering (requires mmdc in PATH)
 	mdViewer.Core().SetMermaidOptions(&navidown.MermaidOptions{Theme: "dark"})

@@ -43,19 +43,17 @@ func NewANSIRenderer() *ANSIStyleRenderer {
 }
 
 // NewANSIRendererWithStyle creates a renderer with the specified style.
-// styleName can be "dark", "light", or "auto".
-// "auto" uses COLORFGBG environment variable to detect terminal background.
+// styleName can be any key from styles.DefaultStyles (e.g. "dark", "light",
+// "dracula", "tokyo-night", "pink") or "auto" to detect from COLORFGBG.
+// Unknown names fall back to "dark".
 func NewANSIRendererWithStyle(styleName string) *ANSIStyleRenderer {
 	var style ansi.StyleConfig
 
-	switch styleName {
-	case "light":
-		style = styles.LightStyleConfig
-	case "auto":
+	if styleName == "auto" {
 		style = detectStyleFromEnvironment()
-	case "dark":
-		fallthrough
-	default:
+	} else if s, ok := styles.DefaultStyles[styleName]; ok {
+		style = *s
+	} else {
 		style = styles.DarkStyleConfig
 	}
 
@@ -101,6 +99,41 @@ func detectStyleFromEnvironment() ansi.StyleConfig {
 	}
 
 	return styles.DarkStyleConfig
+}
+
+// WithCodeTheme returns a new renderer that uses a named Chroma style for code
+// block syntax highlighting, overriding the built-in color map.
+// See https://github.com/alecthomas/chroma/tree/master/styles for available names.
+func (r *ANSIStyleRenderer) WithCodeTheme(theme string) *ANSIStyleRenderer {
+	style := r.glamourStyle
+	style.CodeBlock.Theme = theme
+	style.CodeBlock.Chroma = nil
+	return &ANSIStyleRenderer{
+		glamourStyle: style,
+		wordWrap:     r.wordWrap,
+	}
+}
+
+// WithCodeBackground returns a new renderer with the specified code block
+// background color (e.g. "#282a36", "236").
+func (r *ANSIStyleRenderer) WithCodeBackground(color string) *ANSIStyleRenderer {
+	style := r.glamourStyle
+	style.CodeBlock.BackgroundColor = &color
+	return &ANSIStyleRenderer{
+		glamourStyle: style,
+		wordWrap:     r.wordWrap,
+	}
+}
+
+// WithCodeBorder returns a new renderer with the specified code block
+// border color (e.g. "#6272a4", "244").
+func (r *ANSIStyleRenderer) WithCodeBorder(color string) *ANSIStyleRenderer {
+	style := r.glamourStyle
+	style.CodeBlock.Color = &color
+	return &ANSIStyleRenderer{
+		glamourStyle: style,
+		wordWrap:     r.wordWrap,
+	}
 }
 
 // WithWordWrap returns a new renderer with specified word wrap.
