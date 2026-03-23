@@ -127,8 +127,14 @@ func writeCodeLines(w io.Writer, lines []string, innerWidth int,
 		if bgEscape != "" {
 			lineBuf.WriteString(bgEscape)
 		}
+		if hasBorders {
+			lineBuf.WriteString(" ")
+		}
 		lineBuf.WriteString(line)
 		lineBuf.WriteString(strings.Repeat(" ", pad))
+		if hasBorders {
+			lineBuf.WriteString(" ")
+		}
 		if bgEscape != "" {
 			lineBuf.WriteString(ansiFullReset)
 		}
@@ -221,10 +227,10 @@ func (e *CodeBlockElement) Render(w io.Writer, ctx RenderContext) error {
 	// render borders for non-ASCII profiles with sufficient width
 	hasBorders := profile != termenv.Ascii && width >= 8
 
-	// inner width for code content (subtract 2 for side borders)
+	// inner width for code content (subtract 2 for side borders + 2 for padding)
 	innerWidth := width
 	if hasBorders {
-		innerWidth = width - 2
+		innerWidth = width - 4
 	}
 
 	marginPrefix := strings.Repeat(" ", int(indentation+margin)) //nolint:gosec // terminal indent is structurally bounded

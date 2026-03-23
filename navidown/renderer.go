@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alecthomas/chroma/v2"
+	chromaStyles "github.com/alecthomas/chroma/v2/styles"
 	"github.com/boolean-maybe/navidown/internal/glamour"
 	"github.com/boolean-maybe/navidown/internal/glamour/ansi"
 	"github.com/boolean-maybe/navidown/internal/glamour/styles"
@@ -61,6 +63,11 @@ func NewANSIRendererWithStyle(styleName string) *ANSIStyleRenderer {
 	style.Document.Margin = uintPtr(0)
 	style.CodeBlock.Margin = uintPtr(0)
 
+	// default code block border color if not specified by the style
+	if style.CodeBlock.Color == nil {
+		style.CodeBlock.Color = stringPtr("#808080")
+	}
+
 	// soften inline code color from bright red to muted steel blue
 	style.Code.Color = stringPtr("109")
 
@@ -108,6 +115,16 @@ func (r *ANSIStyleRenderer) WithCodeTheme(theme string) *ANSIStyleRenderer {
 	style := r.glamourStyle
 	style.CodeBlock.Theme = theme
 	style.CodeBlock.Chroma = nil
+
+	// apply the theme's background color so code blocks get the correct bg
+	// even without an explicit WithCodeBackground call
+	if cs := chromaStyles.Get(theme); cs != nil {
+		if bg := cs.Get(chroma.Background).Background; bg.IsSet() {
+			bgStr := bg.String()
+			style.CodeBlock.BackgroundColor = &bgStr
+		}
+	}
+
 	return &ANSIStyleRenderer{
 		glamourStyle: style,
 		wordWrap:     r.wordWrap,

@@ -100,6 +100,14 @@ func TestWithCodeTheme(t *testing.T) {
 		t.Error("expected Chroma=nil after WithCodeTheme")
 	}
 
+	// should extract dracula's background color (#282a36)
+	if modified.glamourStyle.CodeBlock.BackgroundColor == nil {
+		t.Fatal("expected BackgroundColor to be set from chroma theme")
+	}
+	if *modified.glamourStyle.CodeBlock.BackgroundColor != "#282a36" {
+		t.Errorf("expected BackgroundColor=#282a36, got %q", *modified.glamourStyle.CodeBlock.BackgroundColor)
+	}
+
 	// original unchanged
 	if original.glamourStyle.CodeBlock.Theme == "dracula" {
 		t.Error("WithCodeTheme mutated the original renderer")

@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Codeblock Formatting Playground</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #0d0d0d;
+    color: #ccc;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    grid-template-rows: 1fr auto;
+    height: 100vh;
+  }
+
+  .controls {
+    grid-row: 1 / 3;
+    padding: 16px;
+    overflow-y: hidden;
+    border-right: 1px solid #222;
+    background: #111;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .preview {
+    padding: 32px;
+    overflow-y: auto;
+  }
+
+  .prompt-area {
+    border-top: 1px solid #222;
+    padding: 12px 24px;
+    background: #111;
+  }
+
+  .prompt-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .prompt-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .prompt-text {
+    flex: 1;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 12px;
+    color: #aaa;
+    white-space: pre-wrap;
+    line-height: 1.5;
+    max-height: 60px;
+    overflow-y: auto;
+  }
+
+  .prompt-cmd {
+    color: #8ab4f8;
+    white-space: nowrap;
+    overflow-x: auto;
+    max-height: none;
+  }
+
+  .copy-btn {
+    background: #333;
+    color: #ccc;
+    border: 1px solid #444;
+    padding: 6px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .copy-btn:hover { background: #444; }
+  .copy-btn.copied { background: #2a5a2a; border-color: #3a7a3a; color: #8f8; }
+
+  h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #666;
+    margin: 20px 0 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #222;
+  }
+  h2:first-child { margin-top: 0; }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 6px 0;
+    gap: 8px;
+  }
+
+  .control-row label {
+    font-size: 12px;
+    color: #999;
+    flex-shrink: 0;
+  }
+
+  .control-row .value {
+    font-size: 11px;
+    color: #666;
+    font-family: monospace;
+    min-width: 48px;
+    text-align: right;
+  }
+
+  input[type="range"] {
+    flex: 1;
+    max-width: 120px;
+    accent-color: #666;
+  }
+
+  input[type="color"] {
+    width: 32px;
+    height: 24px;
+    border: 1px solid #333;
+    border-radius: 3px;
+    background: none;
+    cursor: pointer;
+    padding: 0;
+  }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+  input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
+
+  select {
+    background: #1a1a1a;
+    color: #ccc;
+    border: 1px solid #333;
+    padding: 4px 6px;
+    font-size: 12px;
+    border-radius: 3px;
+    max-width: 150px;
+  }
+
+  .presets {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 8px 0;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .preset-btn {
+    background: #1a1a1a;
+    color: #888;
+    border: 1px solid #222;
+    padding: 6px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .preset-btn:hover { background: #252525; color: #bbb; }
+  .preset-btn.active { background: #1e2a1e; border-color: #3a5a3a; color: #adc; }
+
+  .preset-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    border: 1px solid #444;
+    flex-shrink: 0;
+  }
+
+  /* Preview code block styling */
+  .code-block-wrapper {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre;
+    tab-size: 4;
+    overflow: hidden;
+  }
+
+  .code-border-top, .code-border-bottom, .code-line {
+    display: block;
+    overflow: hidden;
+    white-space: pre;
+  }
+
+  .code-container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    max-width: 700px;
+    margin: 0 auto;
+    padding-bottom: 32px;
+  }
+
+  .chroma-token { display: inline; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="controls">
+    <h2>Theme</h2>
+    <div class="presets" id="presets"></div>
+
+    <h2>Background</h2>
+    <div class="control-row">
+      <label>Color</label>
+      <input type="color" id="bgColor">
+      <span class="value" id="bgColorVal"></span>
+    </div>
+
+    <h2>Border</h2>
+    <div class="control-row">
+      <label>Color</label>
+      <input type="color" id="borderColor">
+      <span class="value" id="borderColorVal"></span>
+    </div>
+
+    <h2>Spacing</h2>
+    <div class="control-row">
+      <label>Left Padding</label>
+      <input type="range" id="leftPad" min="0" max="4" step="1">
+      <span class="value" id="leftPadVal"></span>
+    </div>
+
+    <h2>Page Background</h2>
+    <div class="control-row">
+      <label>Color</label>
+      <input type="color" id="pageBg">
+      <span class="value" id="pageBgVal"></span>
+    </div>
+
+  </div>
+
+  <div class="preview" id="previewArea">
+    <div class="code-container" id="codeContainer"></div>
+  </div>
+
+  <div class="prompt-area">
+    <div class="prompt-lines">
+      <div class="prompt-row">
+        <div class="prompt-text" id="promptOutput"></div>
+        <button class="copy-btn" id="copyBtn">Copy</button>
+      </div>
+      <div class="prompt-row">
+        <code class="prompt-text prompt-cmd" id="cmdOutput"></code>
+        <button class="copy-btn" id="copyCmdBtn">Copy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// chroma themes — name to background color mapping + token colors
+const CHROMA_THEMES = {
+  'monokai': {
+    bg: '#272822',
+    tokens: { text: '#f8f8f2', comment: '#75715e', keyword: '#66d9ef', keyword_reserved: '#f92672', keyword_type: '#66d9ef', string: '#e6db74', number: '#ae81ff', function: '#a6e22e', operator: '#f92672', punct: '#f8f8f2', name: '#f8f8f2', decorator: '#a6e22e', class: '#a6e22e', tag: '#f92672', attr: '#a6e22e', deleted: '#f92672', inserted: '#a6e22e' }
+  },
+  'dracula': {
+    bg: '#282a36',
+    tokens: { text: '#f8f8f2', comment: '#6272A4', keyword: '#ff79c6', keyword_reserved: '#ff79c6', keyword_type: '#8be9fd', string: '#f1fa8c', number: '#bd93f9', function: '#50fa7b', operator: '#ff79c6', punct: '#f8f8f2', name: '#8be9fd', decorator: '#50fa7b', class: '#8be9fd', tag: '#ff79c6', attr: '#50fa7b', deleted: '#ff5555', inserted: '#50fa7b' }
+  },
+  'github-dark': {
+    bg: '#0d1117',
+    tokens: { text: '#c9d1d9', comment: '#8b949e', keyword: '#ff7b72', keyword_reserved: '#ff7b72', keyword_type: '#79c0ff', string: '#a5d6ff', number: '#79c0ff', function: '#d2a8ff', operator: '#ff7b72', punct: '#c9d1d9', name: '#c9d1d9', decorator: '#d2a8ff', class: '#f0883e', tag: '#7ee787', attr: '#79c0ff', deleted: '#ffa198', inserted: '#7ee787' }
+  },
+  'solarized-dark': {
+    bg: '#002b36',
+    tokens: { text: '#839496', comment: '#586e75', keyword: '#859900', keyword_reserved: '#cb4b16', keyword_type: '#b58900', string: '#2aa198', number: '#d33682', function: '#268bd2', operator: '#859900', punct: '#839496', name: '#839496', decorator: '#b58900', class: '#b58900', tag: '#268bd2', attr: '#b58900', deleted: '#dc322f', inserted: '#859900' }
+  },
+  'nord': {
+    bg: '#2e3440',
+    tokens: { text: '#d8dee9', comment: '#616e88', keyword: '#81a1c1', keyword_reserved: '#81a1c1', keyword_type: '#8fbcbb', string: '#a3be8c', number: '#b48ead', function: '#88c0d0', operator: '#81a1c1', punct: '#eceff4', name: '#d8dee9', decorator: '#d08770', class: '#8fbcbb', tag: '#81a1c1', attr: '#8fbcbb', deleted: '#bf616a', inserted: '#a3be8c' }
+  },
+  'onedark': {
+    bg: '#282c34',
+    tokens: { text: '#abb2bf', comment: '#7f848e', keyword: '#c678dd', keyword_reserved: '#c678dd', keyword_type: '#e5c07b', string: '#98c379', number: '#d19a66', function: '#61afef', operator: '#56b6c2', punct: '#abb2bf', name: '#e06c75', decorator: '#61afef', class: '#e5c07b', tag: '#e06c75', attr: '#e06c75', deleted: '#e06c75', inserted: '#98c379' }
+  },
+  'catppuccin-mocha': {
+    bg: '#1e1e2e',
+    tokens: { text: '#cdd6f4', comment: '#6c7086', keyword: '#cba6f7', keyword_reserved: '#cba6f7', keyword_type: '#f9e2af', string: '#a6e3a1', number: '#fab387', function: '#89b4fa', operator: '#89dceb', punct: '#cdd6f4', name: '#f38ba8', decorator: '#fab387', class: '#f9e2af', tag: '#f38ba8', attr: '#fab387', deleted: '#f38ba8', inserted: '#a6e3a1' }
+  },
+  'catppuccin-frappe': {
+    bg: '#303446',
+    tokens: { text: '#c6d0f5', comment: '#737994', keyword: '#ca9ee6', keyword_reserved: '#ca9ee6', keyword_type: '#e78284', string: '#a6d189', number: '#ef9f76', function: '#8caaee', operator: '#99d1db', punct: '#c6d0f5', name: '#c6d0f5', decorator: '#8caaee', class: '#e5c890', tag: '#ca9ee6', attr: '#8caaee', deleted: '#e78284', inserted: '#a6d189' }
+  },
+  'catppuccin-macchiato': {
+    bg: '#24273a',
+    tokens: { text: '#cad3f5', comment: '#6e738d', keyword: '#c6a0f6', keyword_reserved: '#c6a0f6', keyword_type: '#ed8796', string: '#a6da95', number: '#f5a97f', function: '#8aadf4', operator: '#91d7e3', punct: '#cad3f5', name: '#cad3f5', decorator: '#8aadf4', class: '#eed49f', tag: '#c6a0f6', attr: '#8aadf4', deleted: '#ed8796', inserted: '#a6da95' }
+  },
+  'tokyonight-night': {
+    bg: '#1a1b26',
+    tokens: { text: '#c0caf5', comment: '#414868', keyword: '#bb9af7', keyword_reserved: '#bb9af7', keyword_type: '#41a6b5', string: '#9ece6a', number: '#e0af68', function: '#7aa2f7', operator: '#9ece6a', punct: '#c0caf5', name: '#c0caf5', decorator: '#7aa2f7', class: '#ff9e64', tag: '#bb9af7', attr: '#7aa2f7', deleted: '#db4b4b', inserted: '#9ece6a' }
+  },
+  'tokyonight-moon': {
+    bg: '#222436',
+    tokens: { text: '#c8d3f5', comment: '#444a73', keyword: '#c099ff', keyword_reserved: '#c099ff', keyword_type: '#4fd6be', string: '#c3e88d', number: '#ffc777', function: '#82aaff', operator: '#c3e88d', punct: '#c8d3f5', name: '#c8d3f5', decorator: '#82aaff', class: '#ff966c', tag: '#c099ff', attr: '#82aaff', deleted: '#c53b53', inserted: '#c3e88d' }
+  },
+  'gruvbox': {
+    bg: '#282828',
+    tokens: { text: '#ebdbb2', comment: '#928374', keyword: '#fb4934', keyword_reserved: '#fb4934', keyword_type: '#fabd2f', string: '#b8bb26', number: '#d3869b', function: '#fabd2f', operator: '#fe8019', punct: '#ebdbb2', name: '#83a598', decorator: '#fe8019', class: '#fabd2f', tag: '#fb4934', attr: '#b8bb26', deleted: '#fb4934', inserted: '#b8bb26' }
+  },
+  'rose-pine': {
+    bg: '#191724',
+    tokens: { text: '#e0def4', comment: '#6e6a86', keyword: '#31748f', keyword_reserved: '#eb6f92', keyword_type: '#9ccfd8', string: '#f6c177', number: '#c4a7e7', function: '#ebbcba', operator: '#31748f', punct: '#908caa', name: '#e0def4', decorator: '#f6c177', class: '#9ccfd8', tag: '#eb6f92', attr: '#c4a7e7', deleted: '#eb6f92', inserted: '#9ccfd8' }
+  },
+  'rose-pine-moon': {
+    bg: '#232136',
+    tokens: { text: '#e0def4', comment: '#6e6a86', keyword: '#3e8fb0', keyword_reserved: '#3e8fb0', keyword_type: '#3e8fb0', string: '#f6c177', number: '#f6c177', function: '#ea9a97', operator: '#908caa', punct: '#908caa', name: '#ea9a97', decorator: '#908caa', class: '#9ccfd8', tag: '#ea9a97', attr: '#ea9a97', deleted: '#eb6f92', inserted: '#9ccfd8' }
+  },
+  'base16-snazzy': {
+    bg: '#282a36',
+    tokens: { text: '#e2e4e5', comment: '#78787e', keyword: '#ff6ac1', keyword_reserved: '#ff6ac1', keyword_type: '#9aedfe', string: '#5af78e', number: '#ff9f43', function: '#57c7ff', operator: '#ff6ac1', punct: '#e2e4e5', name: '#e2e4e5', decorator: '#ff9f43', class: '#f3f99d', tag: '#ff6ac1', attr: '#57c7ff', deleted: '#ff5c57', inserted: '#e2e4e5' }
+  },
+  'doom-one': {
+    bg: '#282c34',
+    tokens: { text: '#b0c4de', comment: '#8a93a5', keyword: '#c678dd', keyword_reserved: '#c678dd', keyword_type: '#ef8383', string: '#98c379', number: '#d19a66', function: '#00b1f7', operator: '#c7bf54', punct: '#b0c4de', name: '#c1abea', decorator: '#e5c07b', class: '#76a9f9', tag: '#e06c75', attr: '#b3d23c', deleted: '#b0c4de', inserted: '#a6e22e' }
+  },
+  'doom-one2': {
+    bg: '#282c34',
+    tokens: { text: '#b0c4de', comment: '#8a93a5', keyword: '#76a9f9', keyword_reserved: '#76a9f9', keyword_type: '#e5c07b', string: '#98c379', number: '#d19a66', function: '#00b1f7', operator: '#54b1c7', punct: '#abb2bf', name: '#aa89ea', decorator: '#e5c07b', class: '#ca72ff', tag: '#76a9f9', attr: '#cebc3a', deleted: '#b0c4de', inserted: '#a6e22e' }
+  },
+  'vulcan': {
+    bg: '#282c34',
+    tokens: { text: '#c9c9c9', comment: '#3e4460', keyword: '#7fbaf5', keyword_reserved: '#7fbaf5', keyword_type: '#57c7ff', string: '#82cc6a', number: '#56b6c2', function: '#57c7ff', operator: '#bc74c4', punct: '#56b6c2', name: '#c9c9c9', decorator: '#ecbe7b', class: '#ecbe7b', tag: '#bc74c4', attr: '#bc74c4', deleted: '#cf5967', inserted: '#ecbe7b' }
+  },
+  'native': {
+    bg: '#202020',
+    tokens: { text: '#d0d0d0', comment: '#999999', keyword: '#6ab825', keyword_reserved: '#6ab825', keyword_type: '#6ab825', string: '#ed9d13', number: '#3677a9', function: '#447fcf', operator: '#d0d0d0', punct: '#d0d0d0', name: '#d0d0d0', decorator: '#ffa500', class: '#447fcf', tag: '#6ab825', attr: '#bbbbbb', deleted: '#d22323', inserted: '#589819' }
+  },
+  'paraiso-dark': {
+    bg: '#2f1e2e',
+    tokens: { text: '#e7e9db', comment: '#776e71', keyword: '#815ba4', keyword_reserved: '#815ba4', keyword_type: '#fec418', string: '#48b685', number: '#f99b15', function: '#06b6ef', operator: '#5bc4bf', punct: '#e7e9db', name: '#e7e9db', decorator: '#5bc4bf', class: '#fec418', tag: '#5bc4bf', attr: '#06b6ef', deleted: '#ef6155', inserted: '#48b685' }
+  },
+  'witchhazel': {
+    bg: '#433e56',
+    tokens: { text: '#f8f8f2', comment: '#b0bec5', keyword: '#c2ffdf', keyword_reserved: '#c2ffdf', keyword_type: '#c2ffdf', string: '#1bc5e0', number: '#c5a3ff', function: '#ceb1ff', operator: '#ffb8d1', punct: '#f8f8f2', name: '#f8f8f2', decorator: '#ceb1ff', class: '#ceb1ff', tag: '#ffb8d1', attr: '#ceb1ff', deleted: '#f92672', inserted: '#a6e22e' }
+  },
+  'xcode-dark': {
+    bg: '#1f1f24',
+    tokens: { text: '#ffffff', comment: '#6c7986', keyword: '#fc5fa3', keyword_reserved: '#fc5fa3', keyword_type: '#fc5fa3', string: '#fc6a5d', number: '#d0bf69', function: '#41a1c0', operator: '#ffffff', punct: '#ffffff', name: '#ffffff', decorator: '#ffffff', class: '#5dd8ff', tag: '#ffffff', attr: '#ffffff', deleted: '#ffffff', inserted: '#ffffff' }
+  },
+  'vitesse-dark': {
+    bg: '#121212',
+    tokens: { text: '#dbd7ca', comment: '#758575', keyword: '#4d9375', keyword_reserved: '#cb7676', keyword_type: '#5da9a7', string: '#c98a7d', number: '#4c9a91', function: '#80a665', operator: '#cb7676', punct: '#858585', name: '#dbd7ca', decorator: '#e6cc77', class: '#5da9a7', tag: '#4d9375', attr: '#e6cc77', deleted: '#cb7676', inserted: '#80a665' }
+  },
+  'dark (glamour default)': {
+    bg: '#373737',
+    tokens: { text: '#C4C4C4', comment: '#676767', keyword: '#00AAFF', keyword_reserved: '#FF5FD2', keyword_type: '#6E6ED8', string: '#C69669', number: '#6EEFC0', function: '#00D787', operator: '#EF8080', punct: '#E8E8A8', name: '#C4C4C4', decorator: '#FFFF87', class: '#F1F1F1', tag: '#B083EA', attr: '#7A7AE6', deleted: '#FD5B5B', inserted: '#00D787' }
+  }
+};
+
+const CODE_SAMPLES = {
+  go: `package main
+
+import "fmt"
+
+// Renderable defines any component that can draw itself.
+type Renderable interface {
+    Draw(screen tcell.Screen, x, y, width, height int)
+    GetRect() (int, int, int, int)
+}
+
+func main() {
+    fmt.Println("hello world")
+}`,
+  python: `from dataclasses import dataclass
+
+@dataclass
+class Config:
+    host: str = "localhost"
+    port: int = 8080
+    debug: bool = False
+
+def serve(config: Config) -> None:
+    """Start the server with the given configuration."""
+    print(f"Listening on {config.host}:{config.port}")
+    if config.debug:
+        print("Debug mode enabled")`,
+  javascript: `async function fetchData(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(\`HTTP \${response.status}\`);
+    }
+    return await response.json();
+  } catch (err) {
+    console.error("fetch failed:", err.message);
+    return null;
+  }
+}`,
+  bash: `#!/bin/bash
+set -euo pipefail
+
+for file in *.md; do
+  if [[ -f "$file" ]]; then
+    echo "Processing: $file"
+    wc -l "$file"
+  fi
+done`,
+  json: `{
+  "name": "navidown",
+  "version": "1.0.0",
+  "dependencies": {
+    "glamour": "^0.7.0",
+    "chroma": "^2.0.0"
+  },
+  "config": {
+    "theme": "dark",
+    "wordWrap": 80
+  }
+}`,
+  sql: `SELECT u.name, COUNT(o.id) AS order_count
+FROM users u
+LEFT JOIN orders o ON u.id = o.user_id
+WHERE u.created_at > '2024-01-01'
+GROUP BY u.name
+HAVING COUNT(o.id) > 5
+ORDER BY order_count DESC;`,
+  rust: `fn main() {
+    let numbers: Vec<i32> = (1..=10).collect();
+    let sum: i32 = numbers.iter()
+        .filter(|&&x| x % 2 == 0)
+        .sum();
+    println!("Sum of evens: {sum}");
+}`,
+  yaml: `services:
+  web:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./data:/var/www/html`
+};
+
+// simple tokenizer — good enough for preview purposes
+function tokenize(code, lang) {
+  const patterns = {
+    go: [
+      [/\/\/.*$/gm, 'comment'],
+      [/\/\*[\s\S]*?\*\//g, 'comment'],
+      [/\b(package|import|func|type|interface|struct|return|if|else|for|range|switch|case|default|var|const|defer|go|select|chan|map|break|continue|fallthrough|goto)\b/g, 'keyword'],
+      [/\b(string|int|int64|float64|bool|byte|rune|error|nil|true|false|iota)\b/g, 'keyword_type'],
+      [/"(?:[^"\\]|\\.)*"/g, 'string'],
+      [/`(?:[^`\\]|\\.)*`/g, 'string'],
+      [/\b\d+(?:\.\d+)?\b/g, 'number'],
+      [/\b[A-Z]\w*\b/g, 'class'],
+      [/\b\w+(?=\()/g, 'function'],
+    ],
+    python: [
+      [/#.*$/gm, 'comment'],
+      [/"""[\s\S]*?"""/g, 'string'],
+      [/\b(from|import|class|def|return|if|else|elif|for|while|try|except|finally|with|as|yield|lambda|pass|break|continue|raise|and|or|not|in|is)\b/g, 'keyword'],
+      [/\b(str|int|float|bool|None|True|False|list|dict|tuple|set)\b/g, 'keyword_type'],
+      [/@\w+/g, 'decorator'],
+      [/f?"(?:[^"\\]|\\.)*"/g, 'string'],
+      [/'(?:[^'\\]|\\.)*'/g, 'string'],
+      [/\b\d+(?:\.\d+)?\b/g, 'number'],
+      [/\b\w+(?=\()/g, 'function'],
+    ],
+    javascript: [
+      [/\/\/.*$/gm, 'comment'],
+      [/\b(async|await|function|const|let|var|return|if|else|for|while|try|catch|finally|throw|new|class|import|export|from|of|in)\b/g, 'keyword'],
+      [/\b(null|undefined|true|false|NaN|Infinity)\b/g, 'keyword_type'],
+      [/`(?:[^`\\]|\\.)*`/g, 'string'],
+      [/"(?:[^"\\]|\\.)*"/g, 'string'],
+      [/'(?:[^'\\]|\\.)*'/g, 'string'],
+      [/\b\d+(?:\.\d+)?\b/g, 'number'],
+      [/\b\w+(?=\()/g, 'function'],
+    ],
+    bash: [
+      [/#.*$/gm, 'comment'],
+      [/\b(if|then|else|elif|fi|for|while|do|done|case|esac|in|function|set|echo|return|exit)\b/g, 'keyword'],
+      [/"(?:[^"\\]|\\.)*"/g, 'string'],
+      [/\$\w+/g, 'name'],
+      [/\b\d+\b/g, 'number'],
+    ],
+    json: [
+      [/"(?:[^"\\]|\\.)*"\s*(?=:)/g, 'keyword'],
+      [/"(?:[^"\\]|\\.)*"/g, 'string'],
+      [/\b(?:true|false|null)\b/g, 'keyword_type'],
+      [/-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b/g, 'number'],
+    ],
+    sql: [
+      [/--.*$/gm, 'comment'],
+      [/\b(SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AND|OR|NOT|IN|AS|ORDER|BY|GROUP|HAVING|COUNT|INSERT|UPDATE|DELETE|CREATE|TABLE|INDEX|DROP|ALTER|SET|INTO|VALUES|DEFAULT|PRIMARY|KEY|REFERENCES|CASCADE|UNIQUE|SERIAL|DESC|ASC|LIMIT|OFFSET|WITH|ZONE|NOW)\b/gi, 'keyword'],
+      [/\b(VARCHAR|INTEGER|NUMERIC|TIMESTAMP|TEXT|BOOLEAN|INT|BIGINT|FLOAT|DATE|CHAR)\b/gi, 'keyword_type'],
+      [/'(?:[^'\\]|\\.)*'/g, 'string'],
+      [/\b\d+(?:\.\d+)?\b/g, 'number'],
+    ],
+    rust: [
+      [/\/\/.*$/gm, 'comment'],
+      [/\b(fn|let|mut|if|else|for|while|loop|match|return|use|mod|pub|struct|enum|impl|trait|where|type|const|static|ref|move|async|await|unsafe)\b/g, 'keyword'],
+      [/\b(i32|i64|u32|u64|f32|f64|bool|str|String|Vec|Option|Result|Self|self)\b/g, 'keyword_type'],
+      [/"(?:[^"\\]|\\.)*"/g, 'string'],
+      [/\b\d+(?:\.\d+)?\b/g, 'number'],
+      [/\b\w+(?=\()/g, 'function'],
+    ],
+    yaml: [
+      [/#.*$/gm, 'comment'],
+      [/^[\w.-]+(?=\s*:)/gm, 'keyword'],
+      [/"(?:[^"\\]|\\.)*"/g, 'string'],
+      [/:\s+(.+)$/gm, 'string'],
+      [/\b(true|false|null|yes|no)\b/gi, 'keyword_type'],
+      [/\b\d+(?:\.\d+)?\b/g, 'number'],
+    ],
+  };
+
+  const rules = patterns[lang] || [];
+  const spans = [];
+
+  for (const [regex, type] of rules) {
+    const re = new RegExp(regex.source, regex.flags);
+    let m;
+    while ((m = re.exec(code)) !== null) {
+      spans.push({ start: m.index, end: m.index + m[0].length, type, text: m[0] });
+    }
+  }
+
+  // sort by position, remove overlaps
+  spans.sort((a, b) => a.start - b.start || b.end - a.end);
+  const filtered = [];
+  let lastEnd = 0;
+  for (const s of spans) {
+    if (s.start >= lastEnd) {
+      filtered.push(s);
+      lastEnd = s.end;
+    }
+  }
+
+  // build HTML
+  let html = '';
+  let pos = 0;
+  for (const s of filtered) {
+    if (s.start > pos) {
+      html += escHtml(code.slice(pos, s.start));
+    }
+    const tokenColor = getTokenColor(s.type);
+    html += `<span style="color:${tokenColor}">${escHtml(s.text)}</span>`;
+    pos = s.end;
+  }
+  if (pos < code.length) {
+    html += escHtml(code.slice(pos));
+  }
+  return html;
+}
+
+function getTokenColor(type) {
+  const t = CHROMA_THEMES[state.theme]?.tokens || CHROMA_THEMES['monokai'].tokens;
+  const map = {
+    comment: t.comment,
+    keyword: t.keyword,
+    keyword_reserved: t.keyword_reserved,
+    keyword_type: t.keyword_type,
+    string: t.string,
+    number: t.number,
+    function: t.function,
+    operator: t.operator,
+    punct: t.punct,
+    name: t.name,
+    decorator: t.decorator,
+    class: t.class,
+    tag: t.tag,
+    attr: t.attr,
+    deleted: t.deleted,
+    inserted: t.inserted,
+  };
+  return map[type] || t.text;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// state
+const DEFAULTS = {
+  theme: 'monokai',
+  bgColor: '#272822',
+  borderColor: '#808080',
+  leftPad: 1,
+  pageBg: '#0d0d0d',
+};
+
+const state = { ...DEFAULTS };
+
+// auto-generate a preset for every theme
+function lightenHex(hex, amount) {
+  const r = Math.min(255, parseInt(hex.slice(1,3), 16) + amount);
+  const g = Math.min(255, parseInt(hex.slice(3,5), 16) + amount);
+  const b = Math.min(255, parseInt(hex.slice(5,7), 16) + amount);
+  return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+}
+function darkenHex(hex, amount) { return lightenHex(hex, -amount); }
+
+const PRESETS = {};
+for (const [name, theme] of Object.entries(CHROMA_THEMES)) {
+  PRESETS[name] = {
+    theme: name,
+    bgColor: theme.bg,
+    leftPad: 1,
+  };
+}
+
+// DOM refs
+const els = {};
+function $(id) { return document.getElementById(id); }
+
+function init() {
+  // populate theme list
+  const presetsDiv = $('presets');
+  for (const [name, preset] of Object.entries(PRESETS)) {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.dataset.theme = name;
+    const swatch = document.createElement('span');
+    swatch.className = 'preset-swatch';
+    swatch.style.background = preset.bgColor;
+    btn.appendChild(swatch);
+    btn.appendChild(document.createTextNode(name));
+    btn.addEventListener('click', () => applyPreset(name));
+    presetsDiv.appendChild(btn);
+  }
+
+  // bind controls
+  bindRange('leftPad', 'leftPadVal', 'leftPad', v => v + ' ch');
+
+  bindColor('bgColor', 'bgColorVal', 'bgColor');
+  bindColor('borderColor', 'borderColorVal', 'borderColor');
+  bindColor('pageBg', 'pageBgVal', 'pageBg');
+
+  // copy buttons
+  function bindCopy(btnId, sourceId) {
+    $(btnId).addEventListener('click', function() {
+      navigator.clipboard.writeText($(sourceId).textContent).then(() => {
+        this.textContent = 'Copied!';
+        this.classList.add('copied');
+        setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 1500);
+      });
+    });
+  }
+  bindCopy('copyBtn', 'promptOutput');
+  bindCopy('copyCmdBtn', 'cmdOutput');
+
+  // apply defaults
+  syncControlsToState();
+  updateAll();
+}
+
+function bindRange(inputId, valId, stateKey, fmt) {
+  const input = $(inputId);
+  const val = $(valId);
+  input.addEventListener('input', function() {
+    state[stateKey] = parseInt(this.value);
+    val.textContent = fmt(state[stateKey]);
+    updateAll();
+  });
+}
+
+function bindColor(inputId, valId, stateKey) {
+  const input = $(inputId);
+  const val = $(valId);
+  input.addEventListener('input', function() {
+    state[stateKey] = this.value;
+    val.textContent = this.value;
+    updateAll();
+  });
+}
+
+function syncControlsToState() {
+  // highlight active theme in list
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === state.theme);
+  });
+  $('bgColor').value = state.bgColor;
+  $('bgColorVal').textContent = state.bgColor;
+  $('borderColor').value = state.borderColor;
+  $('borderColorVal').textContent = state.borderColor;
+  $('leftPad').value = state.leftPad;
+  $('leftPadVal').textContent = state.leftPad + ' ch';
+  $('pageBg').value = state.pageBg;
+  $('pageBgVal').textContent = state.pageBg;
+}
+
+function applyPreset(name) {
+  const p = PRESETS[name];
+  Object.assign(state, p);
+  syncControlsToState();
+  updateAll();
+}
+
+function updateAll() {
+  renderPreview();
+  updatePrompt();
+}
+
+// build a top border: ╭─ label ─────╮
+function buildTopBorder(label, charWidth) {
+  if (charWidth < 4) return '';
+  const inner = charWidth - 2; // minus corners
+  if (label) {
+    const labelPart = ' ' + label + ' ';
+    const fill = Math.max(0, inner - 1 - labelPart.length); // 1 for leading ─
+    return '╭─' + labelPart + '─'.repeat(fill) + '╮';
+  }
+  return '╭' + '─'.repeat(inner) + '╮';
+}
+
+function buildBottomBorder(charWidth) {
+  if (charWidth < 4) return '';
+  return '╰' + '─'.repeat(charWidth - 2) + '╯';
+}
+
+function renderPreview() {
+  const container = $('codeContainer');
+  const area = $('previewArea');
+  const textColor = CHROMA_THEMES[state.theme]?.tokens.text || '#ccc';
+  const borderColor = state.borderColor;
+  // approximate character width from the container
+  const charWidth = 72;
+
+  container.innerHTML = '';
+  for (const [lang, code] of Object.entries(CODE_SAMPLES)) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'code-block-wrapper';
+    wrapper.style.width = charWidth + 'ch';
+
+    // top border with language label
+    const top = document.createElement('span');
+    top.className = 'code-border-top';
+    top.style.color = borderColor;
+    top.style.background = state.bgColor;
+    top.textContent = buildTopBorder(lang, charWidth);
+    wrapper.appendChild(top);
+
+    // code lines: each line gets bg fill across full width
+    const lines = code.split('\n');
+    const innerWidth = charWidth - 2; // minus side borders
+    const linesDiv = document.createElement('span');
+    linesDiv.className = 'code-lines';
+    for (const line of lines) {
+      const lineEl = document.createElement('span');
+      lineEl.className = 'code-line';
+      lineEl.style.background = state.bgColor;
+
+      // build: │ + code (padded to innerWidth with spaces) + │
+      // borders get border color fg + code bg
+      const leftB = `<span style="color:${borderColor}">│</span>`;
+      const rightB = `<span style="color:${borderColor}">│</span>`;
+      const lp = state.leftPad;
+      const codeHtml = tokenize(line, lang);
+      const visLen = line.length + lp;
+      const pad = Math.max(0, innerWidth - visLen);
+      lineEl.innerHTML = leftB +
+        `<span style="color:${textColor}">${' '.repeat(lp)}${codeHtml}${' '.repeat(pad)}</span>` +
+        rightB;
+
+      linesDiv.appendChild(lineEl);
+    }
+    wrapper.appendChild(linesDiv);
+
+    // bottom border
+    const bottom = document.createElement('span');
+    bottom.className = 'code-border-bottom';
+    bottom.style.color = borderColor;
+    bottom.style.background = state.bgColor;
+    bottom.textContent = buildBottomBorder(charWidth);
+    wrapper.appendChild(bottom);
+
+    container.appendChild(wrapper);
+  }
+
+  area.style.background = state.pageBg;
+}
+
+function updatePrompt() {
+  const parts = [];
+
+  parts.push(`Use the "${state.theme}" chroma theme for syntax highlighting`);
+
+  if (state.bgColor !== CHROMA_THEMES[state.theme]?.bg) {
+    parts.push(`code block background color ${state.bgColor}`);
+  }
+
+  parts.push(`border color ${state.borderColor}`);
+
+  if (state.leftPad > 0) {
+    parts.push(`${state.leftPad} character left padding`);
+  }
+
+  const prompt = `Style the code blocks with: ${parts.join('; ')}.`;
+  $('promptOutput').textContent = prompt;
+
+  // build CLI command
+  const cmdParts = ['go run ./cmd/tview'];
+  if (state.theme !== 'dark (glamour default)') {
+    cmdParts.push(`--syntax-theme '${state.theme}'`);
+  }
+  if (state.bgColor !== CHROMA_THEMES[state.theme]?.bg) {
+    cmdParts.push(`--syntax-background '${state.bgColor}'`);
+  }
+  if (state.borderColor !== DEFAULTS.borderColor) {
+    cmdParts.push(`--syntax-border '${state.borderColor}'`);
+  }
+  cmdParts.push('test-codeblocks.md');
+  $('cmdOutput').textContent = cmdParts.join(' ');
+}
+
+init();
+</script>
+</body>
+</html>
