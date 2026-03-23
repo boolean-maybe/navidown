@@ -214,18 +214,7 @@ func (v *BoxViewer) refreshDisplayCache() {
 		return // Content unchanged, skip reprocessing
 	}
 
-	joined := strings.Join(lines, "\n")
-	var converted string
-	if v.ansiConverter != nil {
-		converted = v.ansiConverter.Convert(joined)
-	} else {
-		converted = tview.TranslateANSI(joined)
-	}
-
-	// strip invisible markers from display lines - they're only used for position calculation
-	converted = nav.StripMarkers(converted)
-
-	v.displayLines = strings.Split(converted, "\n")
+	v.displayLines = convertDisplayLines(lines, v.ansiConverter)
 	v.lastContentHash = newHash
 }
 

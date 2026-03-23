@@ -114,11 +114,14 @@ func writeCodeLines(w io.Writer, lines []string, innerWidth int,
 	for _, line := range lines {
 		lineBuf.Reset()
 		visWidth := ansi.PrintableRuneWidth(line)
-		if visWidth > innerWidth {
+		if innerWidth > 0 && visWidth > innerWidth {
 			line = xansi.Truncate(line, innerWidth, "")
 			visWidth = innerWidth
 		}
 		pad := innerWidth - visWidth
+		if pad < 0 {
+			pad = 0
+		}
 
 		lineBuf.WriteString(marginPrefix)
 		if hasBorders {

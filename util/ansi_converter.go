@@ -10,6 +10,11 @@ import (
 // Package-level compiled regex for ANSI SGR sequences (avoids recompilation per call).
 var ansiSGRPattern = regexp.MustCompile(`\x1b\[([0-9;]*)m`)
 
+// tviewTagEscapePattern matches bracket patterns that tview would interpret as
+// style tags (e.g. [link], [red], [#ff0000]) and escapes them by inserting []
+// before the closing ]. This mirrors tview.Escape but avoids importing tview.
+var tviewTagEscapePattern = regexp.MustCompile(`(\[[a-zA-Z0-9_,;: \-\."#]+\[*)\]`)
+
 // AnsiConverter converts ANSI escape sequences to tview color tags.
 type AnsiConverter struct {
 	enabled bool
@@ -38,7 +43,9 @@ func (c *AnsiConverter) Convert(text string) string {
 
 	matches := ansiSGRPattern.FindAllStringSubmatchIndex(text, -1)
 	for _, match := range matches {
-		result.WriteString(text[lastIndex:match[0]])
+		// escape tview-like tag patterns in text segments so tview
+		// doesn't misinterpret e.g. [link] as a color/style tag
+		result.WriteString(escapeTviewTags(text[lastIndex:match[0]]))
 
 		params := text[match[2]:match[3]]
 
@@ -53,8 +60,14 @@ func (c *AnsiConverter) Convert(text string) string {
 		lastIndex = match[1]
 	}
 
-	result.WriteString(text[lastIndex:])
+	result.WriteString(escapeTviewTags(text[lastIndex:]))
 	return result.String()
+}
+
+// escapeTviewTags escapes bracket patterns that tview would interpret as style
+// tags by inserting [] before the closing ]. Width-neutral for tview display.
+func escapeTviewTags(s string) string {
+	return tviewTagEscapePattern.ReplaceAllString(s, "$1[]")
 }
 
 func parseSGR(params string, currentFg, currentBg string, currentBold bool) (fg, bg string, bold bool) {
