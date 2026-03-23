@@ -3,11 +3,13 @@ package navidown
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/xml"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -108,6 +110,117 @@ func (c *CachingSVGRasterizer) Close() {
 	if c.tempDir != "" {
 		_ = os.RemoveAll(c.tempDir)
 	}
+}
+
+// parseSVGDimensions extracts intrinsic width and height from SVG data.
+// It checks the root <svg> element's width/height attributes first,
+// falling back to viewBox dimensions. Returns (0, 0, false) if no
+// intrinsic dimensions can be determined.
+func parseSVGDimensions(data []byte) (width, height float64, ok bool) {
+	decoder := xml.NewDecoder(bytes.NewReader(data))
+	decoder.Strict = false
+	decoder.AutoClose = xml.HTMLAutoClose
+
+	for {
+		tok, err := decoder.Token()
+		if err != nil {
+			return 0, 0, false
+		}
+		se, isSE := tok.(xml.StartElement)
+		if !isSE {
+			continue
+		}
+		if se.Name.Local != "svg" {
+			continue
+		}
+
+		var rawW, rawH, viewBox string
+		for _, attr := range se.Attr {
+			switch attr.Name.Local {
+			case "width":
+				rawW = attr.Value
+			case "height":
+				rawH = attr.Value
+			case "viewBox":
+				viewBox = attr.Value
+			}
+		}
+
+		w, wOK := parseSVGLength(rawW)
+		h, hOK := parseSVGLength(rawH)
+		if wOK && hOK && w > 0 && h > 0 {
+			return w, h, true
+		}
+
+		// fall back to viewBox
+		if vw, vh, vOK := parseViewBox(viewBox); vOK {
+			return vw, vh, true
+		}
+		return 0, 0, false
+	}
+}
+
+// parseSVGLength parses a CSS length value (e.g. "90", "90px", "72pt").
+// Returns the value in pixels and true, or (0, false) for unparseable
+// or viewport-relative values (%, em, rem).
+func parseSVGLength(s string) (float64, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, false
+	}
+
+	// separate numeric prefix from unit suffix
+	i := 0
+	for i < len(s) && (s[i] == '.' || s[i] == '-' || s[i] == '+' || (s[i] >= '0' && s[i] <= '9')) {
+		i++
+	}
+	if i == 0 {
+		return 0, false
+	}
+
+	num, err := strconv.ParseFloat(s[:i], 64)
+	if err != nil {
+		return 0, false
+	}
+
+	unit := strings.TrimSpace(s[i:])
+	switch unit {
+	case "", "px":
+		return num, true
+	case "pt":
+		return num * 96.0 / 72.0, true
+	case "in":
+		return num * 96.0, true
+	case "cm":
+		return num * 96.0 / 2.54, true
+	case "mm":
+		return num * 96.0 / 25.4, true
+	default:
+		// %, em, rem, ex, etc. — viewport-relative, skip
+		return 0, false
+	}
+}
+
+// parseViewBox extracts width and height from a viewBox attribute value
+// formatted as "minX minY width height".
+func parseViewBox(s string) (width, height float64, ok bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, 0, false
+	}
+	parts := strings.Fields(s)
+	if len(parts) != 4 {
+		return 0, 0, false
+	}
+	w, err := strconv.ParseFloat(parts[2], 64)
+	if err != nil || w <= 0 {
+		return 0, 0, false
+	}
+	h, err := strconv.ParseFloat(parts[3], 64)
+	if err != nil || h <= 0 {
+		return 0, 0, false
+	}
+	return w, h, true
 }
 
 // isSVGData returns true if data looks like an SVG document.

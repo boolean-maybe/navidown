@@ -117,8 +117,10 @@ func TestImageResolver_SVG(t *testing.T) {
 	if !mock.called {
 		t.Fatal("expected mock rasterizer to be called")
 	}
-	if mock.width != defaultSVGRasterWidth {
-		t.Errorf("rasterizer width = %d, want %d", mock.width, defaultSVGRasterWidth)
+	// SVG has width="100", so rasterize at 100 * defaultSVGScaleFactor = 100
+	expectedWidth := 100 * defaultSVGScaleFactor
+	if mock.width != expectedWidth {
+		t.Errorf("rasterizer width = %d, want %d", mock.width, expectedWidth)
 	}
 	if info.Width != 1 || info.Height != 1 {
 		t.Errorf("dimensions = %dx%d, want 1x1", info.Width, info.Height)
@@ -131,7 +133,8 @@ func TestImageResolver_SVG(t *testing.T) {
 func TestImageResolver_SVG_CustomWidth(t *testing.T) {
 	dir := t.TempDir()
 	svgPath := filepath.Join(dir, "test.svg")
-	svgContent := []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"></svg>`)
+	// SVG without explicit dimensions — falls back to svgRasterWidth
+	svgContent := []byte(`<svg xmlns="http://www.w3.org/2000/svg"></svg>`)
 	if err := os.WriteFile(svgPath, svgContent, 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -174,6 +177,175 @@ func TestImageResolver_SVG_RasterizerError(t *testing.T) {
 	}
 	if !mock.called {
 		t.Fatal("expected mock rasterizer to be called")
+	}
+}
+
+func TestParseSVGDimensions(t *testing.T) {
+	tests := []struct {
+		name          string
+		svg           string
+		wantW, wantH  float64
+		wantOK        bool
+		approxCompare bool // use approximate comparison for unit conversions
+	}{
+		{
+			name:  "bare numbers",
+			svg:   `<svg xmlns="http://www.w3.org/2000/svg" width="90" height="20"></svg>`,
+			wantW: 90, wantH: 20, wantOK: true,
+		},
+		{
+			name:  "px units",
+			svg:   `<svg xmlns="http://www.w3.org/2000/svg" width="90px" height="20px"></svg>`,
+			wantW: 90, wantH: 20, wantOK: true,
+		},
+		{
+			name:  "percent with viewBox fallback",
+			svg:   `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 90 20"></svg>`,
+			wantW: 90, wantH: 20, wantOK: true,
+		},
+		{
+			name:  "viewBox only",
+			svg:   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"></svg>`,
+			wantW: 200, wantH: 100, wantOK: true,
+		},
+		{
+			name:  "no dimensions",
+			svg:   `<svg xmlns="http://www.w3.org/2000/svg"></svg>`,
+			wantW: 0, wantH: 0, wantOK: false,
+		},
+		{
+			name:  "pt units",
+			svg:   `<svg xmlns="http://www.w3.org/2000/svg" width="72pt" height="36pt"></svg>`,
+			wantW: 96, wantH: 48, wantOK: true,
+			approxCompare: true,
+		},
+		{
+			name:  "in units",
+			svg:   `<svg xmlns="http://www.w3.org/2000/svg" width="1in" height="0.5in"></svg>`,
+			wantW: 96, wantH: 48, wantOK: true,
+			approxCompare: true,
+		},
+		{
+			name:  "viewBox with offset",
+			svg:   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 20 300 150"></svg>`,
+			wantW: 300, wantH: 150, wantOK: true,
+		},
+		{
+			name:  "xml preamble",
+			svg:   `<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" width="50" height="25"></svg>`,
+			wantW: 50, wantH: 25, wantOK: true,
+		},
+		{
+			name:  "em units fall back to viewBox",
+			svg:   `<svg xmlns="http://www.w3.org/2000/svg" width="10em" height="5em" viewBox="0 0 160 80"></svg>`,
+			wantW: 160, wantH: 80, wantOK: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w, h, ok := parseSVGDimensions([]byte(tt.svg))
+			if ok != tt.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, tt.wantOK)
+			}
+			if !ok {
+				return
+			}
+			if tt.approxCompare {
+				if diff := w - tt.wantW; diff < -0.5 || diff > 0.5 {
+					t.Errorf("width = %f, want ~%f", w, tt.wantW)
+				}
+				if diff := h - tt.wantH; diff < -0.5 || diff > 0.5 {
+					t.Errorf("height = %f, want ~%f", h, tt.wantH)
+				}
+			} else {
+				if w != tt.wantW {
+					t.Errorf("width = %f, want %f", w, tt.wantW)
+				}
+				if h != tt.wantH {
+					t.Errorf("height = %f, want %f", h, tt.wantH)
+				}
+			}
+		})
+	}
+}
+
+func TestImageResolver_SVG_IntrinsicDimensions(t *testing.T) {
+	dir := t.TempDir()
+
+	// SVG with intrinsic width=90 → should rasterize at 90*2=180
+	svgPath := filepath.Join(dir, "badge.svg")
+	svgContent := []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="90" height="20"></svg>`)
+	if err := os.WriteFile(svgPath, svgContent, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	pngBytes := make1x1PNG()
+	mock := &mockSVGRasterizer{pngData: pngBytes}
+
+	resolver := NewImageResolver([]string{dir})
+	resolver.SetSVGRasterizer(mock)
+
+	_, err := resolver.Resolve("badge.svg", filepath.Join(dir, "doc.md"))
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	expectedWidth := 90 * defaultSVGScaleFactor
+	if mock.width != expectedWidth {
+		t.Errorf("rasterizer width = %d, want %d", mock.width, expectedWidth)
+	}
+}
+
+func TestImageResolver_SVG_NoDimensions_FallsBack(t *testing.T) {
+	dir := t.TempDir()
+
+	// SVG without dimensions → should fall back to defaultSVGRasterWidth
+	svgPath := filepath.Join(dir, "nodim.svg")
+	svgContent := []byte(`<svg xmlns="http://www.w3.org/2000/svg"></svg>`)
+	if err := os.WriteFile(svgPath, svgContent, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	pngBytes := make1x1PNG()
+	mock := &mockSVGRasterizer{pngData: pngBytes}
+
+	resolver := NewImageResolver([]string{dir})
+	resolver.SetSVGRasterizer(mock)
+
+	_, err := resolver.Resolve("nodim.svg", filepath.Join(dir, "doc.md"))
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	if mock.width != defaultSVGRasterWidth {
+		t.Errorf("rasterizer width = %d, want %d (fallback)", mock.width, defaultSVGRasterWidth)
+	}
+}
+
+func TestImageResolver_SVG_CustomScaleFactor(t *testing.T) {
+	dir := t.TempDir()
+
+	svgPath := filepath.Join(dir, "badge.svg")
+	svgContent := []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="90" height="20"></svg>`)
+	if err := os.WriteFile(svgPath, svgContent, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	pngBytes := make1x1PNG()
+	mock := &mockSVGRasterizer{pngData: pngBytes}
+
+	resolver := NewImageResolver([]string{dir})
+	resolver.SetSVGRasterizer(mock)
+	resolver.SetSVGScaleFactor(3)
+
+	_, err := resolver.Resolve("badge.svg", filepath.Join(dir, "doc.md"))
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	if mock.width != 270 {
+		t.Errorf("rasterizer width = %d, want 270 (90 * 3)", mock.width)
 	}
 }
 

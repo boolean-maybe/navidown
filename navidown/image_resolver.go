@@ -8,6 +8,7 @@ import (
 	_ "image/jpeg" // Register standard image decoders
 	"image/png"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"sync"
@@ -27,12 +28,15 @@ type ImageInfo struct {
 
 const defaultSVGRasterWidth = 2048
 
+const defaultSVGScaleFactor = 1
+
 // ImageResolver fetches images and decodes their dimensions.
 type ImageResolver struct {
 	searchRoots    []string
 	cache          sync.Map // url -> *ImageInfo
 	svgRasterizer  SVGRasterizer
 	svgRasterWidth int
+	svgScaleFactor int
 }
 
 // NewImageResolver creates a new resolver.
@@ -47,10 +51,17 @@ func (r *ImageResolver) SetSVGRasterizer(rast SVGRasterizer) {
 	r.svgRasterizer = rast
 }
 
-// SetSVGRasterWidth sets the width in pixels used when rasterizing SVG.
-// Zero means use the default (2048).
+// SetSVGRasterWidth sets the fallback width in pixels used when rasterizing
+// SVGs that have no intrinsic dimensions. Zero means use the default (2048).
 func (r *ImageResolver) SetSVGRasterWidth(px int) {
 	r.svgRasterWidth = px
+}
+
+// SetSVGScaleFactor sets the multiplier applied to SVG intrinsic dimensions
+// when rasterizing. For example, 2 means a 90px-wide badge is rasterized at
+// 180px for HiDPI clarity. Zero means use the default (2).
+func (r *ImageResolver) SetSVGScaleFactor(f int) {
+	r.svgScaleFactor = f
 }
 
 // Resolve fetches an image and returns its info. Results are cached.
@@ -116,11 +127,28 @@ func (r *ImageResolver) rasterizeSVG(data []byte) ([]byte, error) {
 	if rast == nil {
 		rast = r.defaultRasterizer()
 	}
-	width := r.svgRasterWidth
-	if width <= 0 {
-		width = defaultSVGRasterWidth
-	}
+
+	width := r.svgRasterizeWidth(data)
 	return rast.Rasterize(data, width)
+}
+
+// svgRasterizeWidth determines the pixel width to rasterize an SVG at.
+// If the SVG has intrinsic dimensions, uses intrinsicWidth * scaleFactor.
+// Otherwise falls back to svgRasterWidth (default 2048).
+func (r *ImageResolver) svgRasterizeWidth(data []byte) int {
+	if w, _, ok := parseSVGDimensions(data); ok && w > 0 {
+		scale := r.svgScaleFactor
+		if scale <= 0 {
+			scale = defaultSVGScaleFactor
+		}
+		return int(math.Ceil(w)) * scale
+	}
+
+	fallback := r.svgRasterWidth
+	if fallback <= 0 {
+		fallback = defaultSVGRasterWidth
+	}
+	return fallback
 }
 
 // defaultRasterizer creates and caches a CachingSVGRasterizer (or falls back to bare ResvgRasterizer).
