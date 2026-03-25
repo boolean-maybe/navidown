@@ -15,6 +15,22 @@ import (
 	"github.com/rivo/tview"
 )
 
+var imageExtensions = map[string]bool{
+	".png":  true,
+	".jpg":  true,
+	".jpeg": true,
+	".gif":  true,
+	".bmp":  true,
+	".tiff": true,
+	".tif":  true,
+	".webp": true,
+	".svg":  true,
+}
+
+func isImageFile(path string) bool {
+	return imageExtensions[strings.ToLower(filepath.Ext(path))]
+}
+
 func main() {
 	// parse flags
 	syntaxTheme := flag.String("syntax-theme", "", "chroma style name for code block syntax highlighting (e.g. dracula, monokai, catppuccin-macchiato)")
@@ -171,6 +187,9 @@ func main() {
 func loadContent(arg string) (content string, sourcePath string, err error) {
 	// check if it's an HTTP(S) URL
 	if strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://") {
+		if isImageFile(arg) {
+			return fmt.Sprintf("![%s](%s)\n", filepath.Base(arg), arg), arg, nil
+		}
 		provider := &loaders.FileHTTP{}
 		content, err := provider.FetchContent(navidown.NavElement{URL: arg})
 		return content, arg, err
@@ -180,6 +199,10 @@ func loadContent(arg string) (content string, sourcePath string, err error) {
 	absPath, err := filepath.Abs(arg)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to resolve path: %w", err)
+	}
+
+	if isImageFile(absPath) {
+		return fmt.Sprintf("![%s](%s)\n", filepath.Base(absPath), absPath), absPath, nil
 	}
 
 	data, err := os.ReadFile(absPath) // #nosec G703 -- path is user's own CLI argument
