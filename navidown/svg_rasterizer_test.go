@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"image"
 	"image/png"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -117,8 +118,8 @@ func TestImageResolver_SVG(t *testing.T) {
 	if !mock.called {
 		t.Fatal("expected mock rasterizer to be called")
 	}
-	// SVG has width="100", so rasterize at 100 * defaultSVGScaleFactor = 100
-	expectedWidth := 100 * defaultSVGScaleFactor
+	// SVG has width="100", so rasterize at ceil(100 * defaultSVGScaleFactor)
+	expectedWidth := int(math.Round(100 * defaultSVGScaleFactor))
 	if mock.width != expectedWidth {
 		t.Errorf("rasterizer width = %d, want %d", mock.width, expectedWidth)
 	}
@@ -291,7 +292,7 @@ func TestImageResolver_SVG_IntrinsicDimensions(t *testing.T) {
 		t.Fatalf("Resolve: %v", err)
 	}
 
-	expectedWidth := 90 * defaultSVGScaleFactor
+	expectedWidth := int(math.Round(90 * defaultSVGScaleFactor))
 	if mock.width != expectedWidth {
 		t.Errorf("rasterizer width = %d, want %d", mock.width, expectedWidth)
 	}
@@ -337,7 +338,7 @@ func TestImageResolver_SVG_CustomScaleFactor(t *testing.T) {
 
 	resolver := NewImageResolver([]string{dir})
 	resolver.SetSVGRasterizer(mock)
-	resolver.SetSVGScaleFactor(3)
+	resolver.SetSVGScaleFactor(3.0)
 
 	_, err := resolver.Resolve("badge.svg", filepath.Join(dir, "doc.md"))
 	if err != nil {
@@ -345,7 +346,7 @@ func TestImageResolver_SVG_CustomScaleFactor(t *testing.T) {
 	}
 
 	if mock.width != 270 {
-		t.Errorf("rasterizer width = %d, want 270 (90 * 3)", mock.width)
+		t.Errorf("rasterizer width = %d, want 270 (ceil(90 * 3.0))", mock.width)
 	}
 }
 

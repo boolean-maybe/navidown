@@ -28,7 +28,7 @@ type ImageInfo struct {
 
 const defaultSVGRasterWidth = 2048
 
-const defaultSVGScaleFactor = 1
+const defaultSVGScaleFactor = 1.2
 
 // ImageResolver fetches images and decodes their dimensions.
 type ImageResolver struct {
@@ -36,7 +36,7 @@ type ImageResolver struct {
 	cache          sync.Map // url -> *ImageInfo
 	svgRasterizer  SVGRasterizer
 	svgRasterWidth int
-	svgScaleFactor int
+	svgScaleFactor float64
 	darkMode       bool
 }
 
@@ -59,9 +59,9 @@ func (r *ImageResolver) SetSVGRasterWidth(px int) {
 }
 
 // SetSVGScaleFactor sets the multiplier applied to SVG intrinsic dimensions
-// when rasterizing. For example, 2 means a 90px-wide badge is rasterized at
-// 180px for HiDPI clarity. Zero means use the default (2).
-func (r *ImageResolver) SetSVGScaleFactor(f int) {
+// when rasterizing. For example, 2.0 means a 90px-wide badge is rasterized at
+// 180px for HiDPI clarity. Zero means use the default (1.1).
+func (r *ImageResolver) SetSVGScaleFactor(f float64) {
 	r.svgScaleFactor = f
 }
 
@@ -154,7 +154,7 @@ func (r *ImageResolver) svgRasterizeWidth(data []byte) int {
 		if scale <= 0 {
 			scale = defaultSVGScaleFactor
 		}
-		return int(math.Ceil(w)) * scale
+		return int(math.Round(w * scale))
 	}
 
 	fallback := r.svgRasterWidth
