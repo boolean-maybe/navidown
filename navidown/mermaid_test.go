@@ -1,6 +1,7 @@
 package navidown
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -519,8 +520,10 @@ func TestMermaidRenderer_DiskCache(t *testing.T) {
 }
 
 func TestMermaidRenderer_CacheKeyIncludesOptions(t *testing.T) {
-	r1 := &MermaidRenderer{opts: MermaidOptions{Theme: "dark"}}
-	r2 := &MermaidRenderer{opts: MermaidOptions{Theme: "forest"}}
+	opts1 := MermaidOptions{Theme: "dark"}
+	opts2 := MermaidOptions{Theme: "forest"}
+	r1 := &MermaidRenderer{opts: opts1, configData: opts1.resolvedConfigData()}
+	r2 := &MermaidRenderer{opts: opts2, configData: opts2.resolvedConfigData()}
 
 	source := "graph TD\n    A-->B\n"
 	k1 := r1.cacheKey(source)
@@ -531,11 +534,59 @@ func TestMermaidRenderer_CacheKeyIncludesOptions(t *testing.T) {
 	}
 
 	// same options = same key
-	r3 := &MermaidRenderer{opts: MermaidOptions{Theme: "dark"}}
+	opts3 := MermaidOptions{Theme: "dark"}
+	r3 := &MermaidRenderer{opts: opts3, configData: opts3.resolvedConfigData()}
 	k3 := r3.cacheKey(source)
 	if k1 != k3 {
 		t.Error("same options should produce same cache key")
 	}
+}
+
+func TestResolvedConfigData(t *testing.T) {
+	t.Run("valid JSON with correct theme", func(t *testing.T) {
+		opts := MermaidOptions{Theme: "forest"}
+		data := opts.resolvedConfigData()
+
+		var cfg map[string]any
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			t.Fatalf("invalid JSON: %v", err)
+		}
+		if cfg["theme"] != "forest" {
+			t.Errorf("theme: got %q, want %q", cfg["theme"], "forest")
+		}
+	})
+
+	t.Run("default theme is base", func(t *testing.T) {
+		opts := MermaidOptions{}
+		data := opts.resolvedConfigData()
+
+		var cfg map[string]any
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			t.Fatalf("invalid JSON: %v", err)
+		}
+		if cfg["theme"] != "base" {
+			t.Errorf("theme: got %q, want %q", cfg["theme"], "base")
+		}
+	})
+
+	t.Run("different themes produce different bytes", func(t *testing.T) {
+		o1 := MermaidOptions{Theme: "dark"}
+		o2 := MermaidOptions{Theme: "forest"}
+		d1 := o1.resolvedConfigData()
+		d2 := o2.resolvedConfigData()
+		if string(d1) == string(d2) {
+			t.Error("different themes should produce different config data")
+		}
+	})
+
+	t.Run("deterministic output", func(t *testing.T) {
+		opts := MermaidOptions{Theme: "dark"}
+		d1 := opts.resolvedConfigData()
+		d2 := opts.resolvedConfigData()
+		if string(d1) != string(d2) {
+			t.Error("same options should produce identical config data")
+		}
+	})
 }
 
 func TestResolveCacheDir(t *testing.T) {

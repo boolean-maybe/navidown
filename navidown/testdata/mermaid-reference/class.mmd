@@ -1,0 +1,24 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '14px', 'darkMode': true, 'background': 'transparent', 'fontFamily': 'monospace', 'primaryColor': '#1f2937', 'primaryTextColor': '#f9fafb', 'primaryBorderColor': '#9ca3af', 'secondaryColor': '#374151', 'secondaryTextColor': '#f9fafb', 'secondaryBorderColor': '#9ca3af', 'tertiaryColor': '#4b5563', 'tertiaryTextColor': '#f9fafb', 'tertiaryBorderColor': '#9ca3af', 'lineColor': '#f3f4f6', 'textColor': '#f9fafb', 'mainBkg': '#1f2937', 'nodeBorder': '#9ca3af', 'clusterBkg': '#111827', 'clusterBorder': '#6b7280', 'titleColor': '#ffffff', 'edgeLabelBackground': 'transparent', 'nodeTextColor': '#f9fafb'}}}%%
+classDiagram
+    class Animal {
+        +String name
+        +int age
+        +makeSound() void
+    }
+    class Dog {
+        +String breed
+        +fetch() void
+    }
+    class Cat {
+        +bool indoor
+        +purr() void
+    }
+    class Shelter {
+        +List~Animal~ animals
+        +adopt(Animal) bool
+        +intake(Animal) void
+    }
+
+    Animal <|-- Dog
+    Animal <|-- Cat
+    Shelter "1" --> "*" Animal : houses

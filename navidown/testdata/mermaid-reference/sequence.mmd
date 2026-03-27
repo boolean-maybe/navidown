@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    participant DB
+    Client->>API: POST /login
+    API->>Auth: Validate credentials
+    Auth->>DB: Query user
+    DB-->>Auth: User record
+    Auth-->>API: Token
+    API-->>Client: 200 OK + JWT

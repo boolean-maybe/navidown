@@ -89,7 +89,7 @@ func main() {
 	}
 
 	// enable mermaid diagram rendering (requires mmdc in PATH)
-	mdViewer.Core().SetMermaidOptions(&navidown.MermaidOptions{Theme: "dark"})
+	mdViewer.Core().SetMermaidOptions(&navidown.MermaidOptions{})
 
 	// enable graphviz diagram rendering (requires dot in PATH)
 	mdViewer.Core().SetGraphvizOptions(&navidown.GraphvizOptions{})

@@ -1,0 +1,13 @@
+/* class diagram — larger font for terminal readability */
+text {
+    font-size: 10px !important;
+}
+.nodeLabel, .label div, .label span {
+    font-size: 10px !important;
+}
+.edgeTerminals {
+    font-size: 10px !important;
+}
+.relation {
+    stroke-width: 0.5 !important;
+}
