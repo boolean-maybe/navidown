@@ -37,6 +37,7 @@ type ImageResolver struct {
 	svgRasterizer  SVGRasterizer
 	svgRasterWidth int
 	svgScaleFactor int
+	darkMode       bool
 }
 
 // NewImageResolver creates a new resolver.
@@ -62,6 +63,14 @@ func (r *ImageResolver) SetSVGRasterWidth(px int) {
 // 180px for HiDPI clarity. Zero means use the default (2).
 func (r *ImageResolver) SetSVGScaleFactor(f int) {
 	r.svgScaleFactor = f
+}
+
+// SetDarkMode enables SVG preprocessing that lightens dark gray colors
+// for visibility on dark terminal backgrounds. When true, dark grays
+// (e.g. #333, #555) in fill and stroke attributes are inverted before
+// rasterization. Colors with significant hue are left unchanged.
+func (r *ImageResolver) SetDarkMode(dm bool) {
+	r.darkMode = dm
 }
 
 // Resolve fetches an image and returns its info. Results are cached.
@@ -123,6 +132,10 @@ func (r *ImageResolver) Close() {
 }
 
 func (r *ImageResolver) rasterizeSVG(data []byte) ([]byte, error) {
+	if r.darkMode {
+		data = preprocessSVGForDarkMode(data)
+	}
+
 	rast := r.svgRasterizer
 	if rast == nil {
 		rast = r.defaultRasterizer()

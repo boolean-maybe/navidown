@@ -77,34 +77,38 @@ func NewANSIRendererWithStyle(styleName string) *ANSIStyleRenderer {
 	}
 }
 
+// IsDarkBackground returns true if the terminal appears to have a dark
+// background, based on the COLORFGBG environment variable.
+// Returns true (dark) when the variable is missing or unparseable.
+func IsDarkBackground() bool {
+	colorfgbg := os.Getenv("COLORFGBG")
+	if colorfgbg == "" {
+		return true
+	}
+
+	parts := strings.Split(colorfgbg, ";")
+	if len(parts) < 2 {
+		return true
+	}
+
+	bgStr := strings.TrimSpace(parts[len(parts)-1])
+	bg, err := strconv.Atoi(bgStr)
+	if err != nil {
+		return true
+	}
+
+	// background >= 8 means light background (colors 8-15 are bright)
+	return bg < 8
+}
+
 // detectStyleFromEnvironment detects terminal theme using COLORFGBG.
 // Format: "foreground;background" (e.g., "15;0")
 // Background >= 8 indicates light background, < 8 indicates dark.
 // Defaults to dark on parse errors or missing variable.
 func detectStyleFromEnvironment() ansi.StyleConfig {
-	colorfgbg := os.Getenv("COLORFGBG")
-	if colorfgbg == "" {
-		return styles.DarkStyleConfig
-	}
-
-	// Parse format: "foreground;background"
-	parts := strings.Split(colorfgbg, ";")
-	if len(parts) < 2 {
-		return styles.DarkStyleConfig
-	}
-
-	// Get last component (background color)
-	bgStr := strings.TrimSpace(parts[len(parts)-1])
-	bg, err := strconv.Atoi(bgStr)
-	if err != nil {
-		return styles.DarkStyleConfig
-	}
-
-	// Background >= 8 means light background (colors 8-15 are bright)
-	if bg >= 8 {
+	if !IsDarkBackground() {
 		return styles.LightStyleConfig
 	}
-
 	return styles.DarkStyleConfig
 }
 
