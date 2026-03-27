@@ -1,0 +1,10 @@
+/* state/ER diagrams — larger font for terminal readability */
+text {
+    font-size: 18px !important;
+}
+.nodeLabel, .label div, .label span {
+    font-size: 18px !important;
+}
+.edgeTerminals {
+    font-size: 18px !important;
+}

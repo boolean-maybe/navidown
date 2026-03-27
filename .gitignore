@@ -34,3 +34,6 @@ Thumbs.db
 
 # Claude files
 CLAUDE.md
+
+# Mermaid reference files (generated)
+navidown/testdata/mermaid-reference/

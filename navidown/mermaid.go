@@ -24,6 +24,9 @@ var defaultMermaidCSS []byte
 //go:embed mermaid_class.css
 var classMermaidCSS []byte
 
+//go:embed mermaid_large.css
+var largeMermaidCSS []byte
+
 // MermaidOptions configures mermaid diagram rendering.
 type MermaidOptions struct {
 	MmdcPath        string        // path to mmdc binary; "" = lookup "mmdc" in PATH
@@ -76,9 +79,14 @@ func (o *MermaidOptions) resolvedConfigData() []byte {
 	return configDataWithFontSize(o.resolvedTheme(), "")
 }
 
-// classConfigData returns config JSON with fontSize bumped for class diagrams.
+// classConfigData returns config JSON with fontSize for class diagrams.
 func (o *MermaidOptions) classConfigData() []byte {
 	return configDataWithFontSize(o.resolvedTheme(), "10px")
+}
+
+// largeConfigData returns config JSON with fontSize for state/ER diagrams.
+func (o *MermaidOptions) largeConfigData() []byte {
+	return configDataWithFontSize(o.resolvedTheme(), "18px")
 }
 
 // configDataWithFontSize returns the embedded config with the given theme and
@@ -110,6 +118,9 @@ type MermaidRenderer struct {
 	classConfigData []byte // resolved class config content (used in cache key)
 	cssPath         string // path to default CSS override written to workDir
 	classCSSPath    string // path to class-diagram-specific CSS override
+	largeConfigPath string // path to large-font config JSON (state/ER)
+	largeConfigData []byte // resolved large config content
+	largeCSSPath    string // path to large-font CSS override (state/ER)
 }
 
 // NewMermaidRenderer creates a new renderer. Returns nil if mmdc is not found.
@@ -150,6 +161,17 @@ func NewMermaidRenderer(opts MermaidOptions) *MermaidRenderer {
 		return nil
 	}
 
+	largeConfigData := opts.largeConfigData()
+	largeConfigPath := filepath.Join(workDir, "mermaid-large-config.json")
+	if err := os.WriteFile(largeConfigPath, largeConfigData, 0600); err != nil {
+		return nil
+	}
+
+	largeCSSPath := filepath.Join(workDir, "mermaid-large.css")
+	if err := os.WriteFile(largeCSSPath, largeMermaidCSS, 0600); err != nil {
+		return nil
+	}
+
 	return &MermaidRenderer{
 		opts:            opts,
 		persistentDir:   persistentDir,
@@ -162,28 +184,52 @@ func NewMermaidRenderer(opts MermaidOptions) *MermaidRenderer {
 		classConfigData: classConfigData,
 		cssPath:         cssPath,
 		classCSSPath:    classCSSPath,
+		largeConfigPath: largeConfigPath,
+		largeConfigData: largeConfigData,
+		largeCSSPath:    largeCSSPath,
 	}
 }
 
-// configForSource returns the config and CSS file paths appropriate for the
-// diagram type in source. Class diagrams use larger fonts than the default.
-func (r *MermaidRenderer) configForSource(source string) (configPath, cssPath string) {
-	if isClassDiagram(source) {
-		return r.classConfigPath, r.classCSSPath
-	}
-	return r.configPath, r.cssPath
-}
+// diagramFontTier classifies diagram source into font size tiers.
+type diagramFontTier int
 
-// isClassDiagram reports whether the mermaid source defines a class diagram.
-func isClassDiagram(source string) bool {
+const (
+	tierDefault diagramFontTier = iota // flowchart, sequence — compact 8px
+	tierClass                          // class diagram — medium 10px
+	tierLarge                          // state, ER — large 14px
+)
+
+// fontTier returns the font size tier for the given mermaid source.
+func fontTier(source string) diagramFontTier {
 	for _, line := range strings.SplitN(source, "\n", 10) {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "%%") {
 			continue
 		}
-		return strings.HasPrefix(trimmed, "classDiagram")
+		if strings.HasPrefix(trimmed, "classDiagram") {
+			return tierClass
+		}
+		for _, prefix := range []string{"stateDiagram", "erDiagram"} {
+			if strings.HasPrefix(trimmed, prefix) {
+				return tierLarge
+			}
+		}
+		return tierDefault
 	}
-	return false
+	return tierDefault
+}
+
+// configForSource returns the config and CSS file paths appropriate for the
+// diagram type in source.
+func (r *MermaidRenderer) configForSource(source string) (configPath, cssPath string) {
+	switch fontTier(source) {
+	case tierClass:
+		return r.classConfigPath, r.classCSSPath
+	case tierLarge:
+		return r.largeConfigPath, r.largeCSSPath
+	default:
+		return r.configPath, r.cssPath
+	}
 }
 
 // cacheKey computes a hash incorporating the mermaid source and render options
@@ -192,11 +238,16 @@ func (r *MermaidRenderer) cacheKey(source string) string {
 	h := sha256.New()
 	h.Write([]byte(source))
 	h.Write([]byte{0}) // separator
-	if isClassDiagram(source) {
+	switch fontTier(source) {
+	case tierClass:
 		h.Write(r.classConfigData)
 		h.Write([]byte{0})
 		h.Write(classMermaidCSS)
-	} else {
+	case tierLarge:
+		h.Write(r.largeConfigData)
+		h.Write([]byte{0})
+		h.Write(largeMermaidCSS)
+	default:
 		h.Write(r.configData)
 		h.Write([]byte{0})
 		h.Write(defaultMermaidCSS)
