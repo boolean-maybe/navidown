@@ -1,0 +1,27 @@
+/* git graph — no boxes, monospace font, bright white text */
+
+/* hide branch label background boxes */
+#my-svg .branchLabelBkg {
+    fill: none !important;
+    stroke: none !important;
+}
+
+/* branch label text — larger for readability */
+#my-svg .branchLabel text {
+    font-size: 10px !important;
+    fill: #ffffff !important;
+    font-family: monospace !important;
+}
+
+/* commit label text — larger for readability */
+#my-svg .commit-label {
+    font-size: 10px !important;
+    fill: #ffffff !important;
+    font-family: monospace !important;
+}
+
+/* hide commit label background */
+#my-svg .commit-label-bkg {
+    fill: none !important;
+    opacity: 0 !important;
+}

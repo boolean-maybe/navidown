@@ -1,0 +1,17 @@
+/* gantt — compact terminal rendering overrides */
+
+/* shrink axis tick date labels and push below bars */
+#my-svg .grid .tick text {
+    font-size: 7px !important;
+    transform: translateY(8px);
+}
+
+/* shrink title */
+#my-svg .titleText {
+    font-size: 10px !important;
+}
+
+/* shrink section/lane labels */
+#my-svg .sectionTitle {
+    font-size: 7px !important;
+}

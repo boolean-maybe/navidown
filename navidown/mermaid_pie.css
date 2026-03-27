@@ -1,0 +1,32 @@
+/* pie chart — colorful slices with white borders for dark background */
+
+/* white borders between slices */
+#my-svg .pieCircle {
+    stroke: #ffffff !important;
+    stroke-width: 2px !important;
+    opacity: 0.9 !important;
+}
+
+/* white outer circle */
+#my-svg .pieOuterCircle {
+    stroke: #ffffff !important;
+    stroke-width: 2px !important;
+}
+
+/* percentage labels inside slices */
+#my-svg .slice {
+    font-size: 14px !important;
+    fill: #1e1e2e !important;
+}
+
+/* title */
+#my-svg .pieTitleText {
+    font-size: 16px !important;
+    fill: #cdd6f4 !important;
+}
+
+/* legend text */
+#my-svg .legend text {
+    font-size: 12px !important;
+    fill: #cdd6f4 !important;
+}
