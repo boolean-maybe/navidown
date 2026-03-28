@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 480" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+    <filter id="shadow" x="-4%" y="-4%" width="108%" height="108%">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <!-- title -->
+  <text x="360" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#333">Microservices Architecture</text>
+
+  <!-- client -->
+  <rect x="290" y="50" width="140" height="44" rx="6" fill="#E3F2FD" stroke="#1565C0" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="360" y="77" text-anchor="middle" font-size="13" fill="#1565C0">Browser / Mobile</text>
+
+  <!-- API gateway -->
+  <rect x="260" y="130" width="200" height="44" rx="6" fill="#FFF3E0" stroke="#E65100" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="360" y="157" text-anchor="middle" font-size="13" fill="#E65100">API Gateway</text>
+
+  <!-- services row -->
+  <rect x="40" y="220" width="150" height="50" rx="6" fill="#E8F5E9" stroke="#2E7D32" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="115" y="241" text-anchor="middle" font-size="12" font-weight="bold" fill="#2E7D32">Auth Service</text>
+  <text x="115" y="258" text-anchor="middle" font-size="10" fill="#555">JWT / OAuth2</text>
+
+  <rect x="220" y="220" width="150" height="50" rx="6" fill="#E8F5E9" stroke="#2E7D32" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="295" y="241" text-anchor="middle" font-size="12" font-weight="bold" fill="#2E7D32">User Service</text>
+  <text x="295" y="258" text-anchor="middle" font-size="10" fill="#555">CRUD / profiles</text>
+
+  <rect x="400" y="220" width="150" height="50" rx="6" fill="#E8F5E9" stroke="#2E7D32" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="475" y="241" text-anchor="middle" font-size="12" font-weight="bold" fill="#2E7D32">Order Service</text>
+  <text x="475" y="258" text-anchor="middle" font-size="10" fill="#555">cart / checkout</text>
+
+  <rect x="570" y="220" width="140" height="50" rx="6" fill="#E8F5E9" stroke="#2E7D32" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="640" y="241" text-anchor="middle" font-size="12" font-weight="bold" fill="#2E7D32">Notification</text>
+  <text x="640" y="258" text-anchor="middle" font-size="10" fill="#555">email / push</text>
+
+  <!-- message bus -->
+  <rect x="120" y="310" width="480" height="36" rx="18" fill="#F3E5F5" stroke="#7B1FA2" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="360" y="333" text-anchor="middle" font-size="13" fill="#7B1FA2">Message Bus (Kafka / RabbitMQ)</text>
+
+  <!-- data stores -->
+  <ellipse cx="115" cy="410" rx="70" ry="30" fill="#FFF9C4" stroke="#F9A825" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="115" y="414" text-anchor="middle" font-size="12" fill="#F57F17">Auth DB</text>
+
+  <ellipse cx="295" cy="410" rx="70" ry="30" fill="#FFF9C4" stroke="#F9A825" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="295" y="414" text-anchor="middle" font-size="12" fill="#F57F17">User DB</text>
+
+  <ellipse cx="475" cy="410" rx="70" ry="30" fill="#FFF9C4" stroke="#F9A825" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="475" y="414" text-anchor="middle" font-size="12" fill="#F57F17">Order DB</text>
+
+  <ellipse cx="640" cy="410" rx="60" ry="30" fill="#FFEBEE" stroke="#C62828" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="640" y="414" text-anchor="middle" font-size="12" fill="#C62828">Redis</text>
+
+  <!-- arrows: client -> gateway -->
+  <line x1="360" y1="94" x2="360" y2="128" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- gateway -> services -->
+  <line x1="310" y1="174" x2="115" y2="218" stroke="#555" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <line x1="340" y1="174" x2="295" y2="218" stroke="#555" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <line x1="380" y1="174" x2="475" y2="218" stroke="#555" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <line x1="410" y1="174" x2="640" y2="218" stroke="#555" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+  <!-- services -> bus -->
+  <line x1="115" y1="270" x2="220" y2="308" stroke="#7B1FA2" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <line x1="295" y1="270" x2="310" y2="308" stroke="#7B1FA2" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <line x1="475" y1="270" x2="430" y2="308" stroke="#7B1FA2" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <line x1="640" y1="270" x2="520" y2="308" stroke="#7B1FA2" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+
+  <!-- services -> DBs -->
+  <line x1="115" y1="270" x2="115" y2="378" stroke="#F9A825" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="295" y1="270" x2="295" y2="378" stroke="#F9A825" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="475" y1="270" x2="475" y2="378" stroke="#F9A825" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="640" y1="270" x2="640" y2="378" stroke="#C62828" stroke-width="1" marker-end="url(#arrow)"/>
+</svg>

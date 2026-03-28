@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 440" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="net-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#555"/>
+    </marker>
+    <filter id="nshadow" x="-4%" y="-4%" width="108%" height="110%">
+      <feDropShadow dx="1" dy="1" stdDeviation="2" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <text x="340" y="24" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">Network Topology — 3-Tier Web App</text>
+
+  <!-- Internet zone -->
+  <rect x="15" y="40" width="650" height="70" rx="8" fill="#FFEBEE" stroke="#EF9A9A" stroke-width="1" stroke-dasharray="6 3"/>
+  <text x="30" y="58" font-size="11" fill="#C62828" font-weight="bold">Internet</text>
+
+  <!-- Users -->
+  <rect x="50" y="60" width="80" height="36" rx="6" fill="#FFCDD2" stroke="#C62828" stroke-width="1.5" filter="url(#nshadow)"/>
+  <text x="90" y="83" text-anchor="middle" font-size="11" fill="#C62828">Users</text>
+
+  <!-- CDN -->
+  <rect x="200" y="60" width="80" height="36" rx="6" fill="#FFCDD2" stroke="#C62828" stroke-width="1.5" filter="url(#nshadow)"/>
+  <text x="240" y="83" text-anchor="middle" font-size="11" fill="#C62828">CDN</text>
+
+  <!-- DNS -->
+  <rect x="350" y="60" width="80" height="36" rx="6" fill="#FFCDD2" stroke="#C62828" stroke-width="1.5" filter="url(#nshadow)"/>
+  <text x="390" y="83" text-anchor="middle" font-size="11" fill="#C62828">DNS</text>
+
+  <!-- DMZ -->
+  <rect x="15" y="130" width="650" height="80" rx="8" fill="#FFF3E0" stroke="#FFCC80" stroke-width="1" stroke-dasharray="6 3"/>
+  <text x="30" y="148" font-size="11" fill="#E65100" font-weight="bold">DMZ (10.0.1.0/24)</text>
+
+  <!-- Firewall -->
+  <rect x="130" y="150" width="100" height="36" rx="6" fill="#FFE0B2" stroke="#E65100" stroke-width="1.5" filter="url(#nshadow)"/>
+  <text x="180" y="173" text-anchor="middle" font-size="11" fill="#E65100">Firewall</text>
+
+  <!-- Load Balancer -->
+  <rect x="300" y="150" width="130" height="36" rx="6" fill="#FFE0B2" stroke="#E65100" stroke-width="1.5" filter="url(#nshadow)"/>
+  <text x="365" y="173" text-anchor="middle" font-size="11" fill="#E65100">Load Balancer</text>
+
+  <!-- WAF -->
+  <rect x="490" y="150" width="90" height="36" rx="6" fill="#FFE0B2" stroke="#E65100" stroke-width="1.5" filter="url(#nshadow)"/>
+  <text x="535" y="173" text-anchor="middle" font-size="11" fill="#E65100">WAF</text>
+
+  <!-- App tier -->
+  <rect x="15" y="230" width="650" height="80" rx="8" fill="#E8F5E9" stroke="#A5D6A7" stroke-width="1" stroke-dasharray="6 3"/>
+  <text x="30" y="248" font-size="11" fill="#2E7D32" font-weight="bold">Application Tier (10.0.2.0/24)</text>
+
+  <!-- Web servers -->
+  <rect x="60" y="255" width="110" height="40" rx="6" fill="#C8E6C9" stroke="#2E7D32" stroke-width="1.5" filter="url(#nshadow)"/>
+  <text x="115" y="272" text-anchor="middle" font-size="10" font-weight="bold" fill="#2E7D32">Web Server 1</text>
+  <text x="115" y="286" text-anchor="middle" font-size="9" fill="#555">nginx</text>
+
+  <rect x="200" y="255" width="110" height="40" rx="6" fill="#C8E6C9" stroke="#2E7D32" stroke-width="1.5" filter="url(#nshadow)"/>
+  <text x="255" y="272" text-anchor="middle" font-size="10" font-weight="bold" fill="#2E7D32">Web Server 2</text>
+  <text x="255" y="286" text-anchor="middle" font-size="9" fill="#555">nginx</text>
+
+  <!-- App servers -->
+  <rect x="370" y="255" width="120" height="40" rx="6" fill="#C8E6C9" stroke="#2E7D32" stroke-width="1.5" filter="url(#nshadow)"/>
+  <text x="430" y="272" text-anchor="middle" font-size="10" font-weight="bold" fill="#2E7D32">App Server 1</text>
+  <text x="430" y="286" text-anchor="middle" font-size="9" fill="#555">Go / :8080</text>
+
+  <rect x="520" y="255" width="120" height="40" rx="6" fill="#C8E6C9" stroke="#2E7D32" stroke-width="1.5" filter="url(#nshadow)"/>
+  <text x="580" y="272" text-anchor="middle" font-size="10" font-weight="bold" fill="#2E7D32">App Server 2</text>
+  <text x="580" y="286" text-anchor="middle" font-size="9" fill="#555">Go / :8080</text>
+
+  <!-- Data tier -->
+  <rect x="15" y="330" width="650" height="100" rx="8" fill="#EDE7F6" stroke="#B39DDB" stroke-width="1" stroke-dasharray="6 3"/>
+  <text x="30" y="348" font-size="11" fill="#4527A0" font-weight="bold">Data Tier (10.0.3.0/24)</text>
+
+  <!-- Data stores -->
+  <rect x="60" y="360" width="120" height="50" rx="6" fill="#D1C4E9" stroke="#5E35B1" stroke-width="1.5" filter="url(#nshadow)"/>
+  <text x="120" y="382" text-anchor="middle" font-size="11" font-weight="bold" fill="#4527A0">PostgreSQL</text>
+  <text x="120" y="398" text-anchor="middle" font-size="9" fill="#555">primary :5432</text>
+
+  <rect x="210" y="360" width="120" height="50" rx="6" fill="#D1C4E9" stroke="#5E35B1" stroke-width="1.5" filter="url(#nshadow)"/>
+  <text x="270" y="382" text-anchor="middle" font-size="11" font-weight="bold" fill="#4527A0">PostgreSQL</text>
+  <text x="270" y="398" text-anchor="middle" font-size="9" fill="#555">replica :5432</text>
+
+  <rect x="370" y="360" width="100" height="50" rx="6" fill="#D1C4E9" stroke="#5E35B1" stroke-width="1.5" filter="url(#nshadow)"/>
+  <text x="420" y="382" text-anchor="middle" font-size="11" font-weight="bold" fill="#4527A0">Redis</text>
+  <text x="420" y="398" text-anchor="middle" font-size="9" fill="#555">cache :6379</text>
+
+  <rect x="500" y="360" width="140" height="50" rx="6" fill="#D1C4E9" stroke="#5E35B1" stroke-width="1.5" filter="url(#nshadow)"/>
+  <text x="570" y="382" text-anchor="middle" font-size="11" font-weight="bold" fill="#4527A0">Elasticsearch</text>
+  <text x="570" y="398" text-anchor="middle" font-size="9" fill="#555">logs :9200</text>
+
+  <!-- connections -->
+  <line x1="90" y1="96" x2="170" y2="148" stroke="#555" stroke-width="1.2" marker-end="url(#net-arrow)"/>
+  <line x1="240" y1="96" x2="340" y2="148" stroke="#555" stroke-width="1.2" marker-end="url(#net-arrow)"/>
+  <line x1="365" y1="186" x2="200" y2="253" stroke="#555" stroke-width="1.2" marker-end="url(#net-arrow)"/>
+  <line x1="365" y1="186" x2="430" y2="253" stroke="#555" stroke-width="1.2" marker-end="url(#net-arrow)"/>
+  <line x1="430" y1="295" x2="200" y2="358" stroke="#555" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#net-arrow)"/>
+  <line x1="580" y1="295" x2="420" y2="358" stroke="#555" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#net-arrow)"/>
+</svg>

@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 420" font-family="Consolas, monospace">
+  <defs>
+    <marker id="cd-inherit" markerWidth="12" markerHeight="10" refX="12" refY="5" orient="auto">
+      <polygon points="0 0, 12 5, 0 10" fill="white" stroke="#333" stroke-width="1"/>
+    </marker>
+    <marker id="cd-compose" markerWidth="12" markerHeight="10" refX="12" refY="5" orient="auto">
+      <polygon points="0 5, 6 0, 12 5, 6 10" fill="#333" stroke="#333" stroke-width="1"/>
+    </marker>
+  </defs>
+
+  <text x="330" y="24" text-anchor="middle" font-size="16" font-weight="bold" fill="#333" font-family="Segoe UI, sans-serif">Class Diagram — HTTP Framework</text>
+
+  <!-- interface: Handler -->
+  <rect x="230" y="44" width="200" height="80" rx="4" fill="#EDE7F6" stroke="#5E35B1" stroke-width="1.5"/>
+  <text x="330" y="62" text-anchor="middle" font-size="11" fill="#5E35B1" font-style="italic">&lt;&lt;interface&gt;&gt;</text>
+  <text x="330" y="78" text-anchor="middle" font-size="13" font-weight="bold" fill="#311B92">Handler</text>
+  <line x1="230" y1="84" x2="430" y2="84" stroke="#5E35B1" stroke-width="0.5"/>
+  <text x="240" y="100" font-size="11" fill="#333">+ ServeHTTP(w, r)</text>
+  <text x="240" y="116" font-size="11" fill="#333">+ Pattern() string</text>
+
+  <!-- Router -->
+  <rect x="40" y="170" width="220" height="120" rx="4" fill="#E8F5E9" stroke="#2E7D32" stroke-width="1.5"/>
+  <text x="150" y="192" text-anchor="middle" font-size="13" font-weight="bold" fill="#1B5E20">Router</text>
+  <line x1="40" y1="198" x2="260" y2="198" stroke="#2E7D32" stroke-width="0.5"/>
+  <text x="50" y="214" font-size="11" fill="#555">- routes: map[string]Handler</text>
+  <text x="50" y="230" font-size="11" fill="#555">- middleware: []Middleware</text>
+  <line x1="40" y1="238" x2="260" y2="238" stroke="#2E7D32" stroke-width="0.5"/>
+  <text x="50" y="254" font-size="11" fill="#333">+ Handle(pattern, Handler)</text>
+  <text x="50" y="270" font-size="11" fill="#333">+ Use(Middleware)</text>
+  <text x="50" y="286" font-size="11" fill="#333">+ ServeHTTP(w, r)</text>
+
+  <!-- Middleware -->
+  <rect x="400" y="170" width="240" height="100" rx="4" fill="#FFF3E0" stroke="#E65100" stroke-width="1.5"/>
+  <text x="520" y="192" text-anchor="middle" font-size="13" font-weight="bold" fill="#BF360C">Middleware</text>
+  <line x1="400" y1="198" x2="640" y2="198" stroke="#E65100" stroke-width="0.5"/>
+  <text x="410" y="214" font-size="11" fill="#555">- next: Handler</text>
+  <line x1="400" y1="222" x2="640" y2="222" stroke="#E65100" stroke-width="0.5"/>
+  <text x="410" y="238" font-size="11" fill="#333">+ Wrap(Handler) Handler</text>
+  <text x="410" y="254" font-size="11" fill="#333">+ ServeHTTP(w, r)</text>
+
+  <!-- concrete handlers -->
+  <rect x="40" y="330" width="180" height="80" rx="4" fill="#E3F2FD" stroke="#1565C0" stroke-width="1.5"/>
+  <text x="130" y="352" text-anchor="middle" font-size="13" font-weight="bold" fill="#0D47A1">UserHandler</text>
+  <line x1="40" y1="358" x2="220" y2="358" stroke="#1565C0" stroke-width="0.5"/>
+  <text x="50" y="374" font-size="11" fill="#555">- svc: UserService</text>
+  <line x1="40" y1="382" x2="220" y2="382" stroke="#1565C0" stroke-width="0.5"/>
+  <text x="50" y="398" font-size="11" fill="#333">+ ServeHTTP(w, r)</text>
+
+  <rect x="260" y="330" width="180" height="80" rx="4" fill="#E3F2FD" stroke="#1565C0" stroke-width="1.5"/>
+  <text x="350" y="352" text-anchor="middle" font-size="13" font-weight="bold" fill="#0D47A1">HealthHandler</text>
+  <line x1="260" y1="358" x2="440" y2="358" stroke="#1565C0" stroke-width="0.5"/>
+  <text x="270" y="374" font-size="11" fill="#555">- checks: []Check</text>
+  <line x1="260" y1="382" x2="440" y2="382" stroke="#1565C0" stroke-width="0.5"/>
+  <text x="270" y="398" font-size="11" fill="#333">+ ServeHTTP(w, r)</text>
+
+  <!-- inheritance arrows: concrete -> interface -->
+  <line x1="130" y1="330" x2="290" y2="126" stroke="#333" stroke-width="1.2" marker-end="url(#cd-inherit)"/>
+  <line x1="350" y1="330" x2="340" y2="126" stroke="#333" stroke-width="1.2" marker-end="url(#cd-inherit)"/>
+
+  <!-- implements: Middleware -> Handler -->
+  <line x1="470" y1="170" x2="390" y2="126" stroke="#333" stroke-width="1.2" stroke-dasharray="6 3" marker-end="url(#cd-inherit)"/>
+
+  <!-- composition: Router -> Handler (routes) -->
+  <line x1="150" y1="170" x2="280" y2="126" stroke="#333" stroke-width="1.2" marker-end="url(#cd-compose)"/>
+  <text x="190" y="145" font-size="10" fill="#666" font-family="Segoe UI, sans-serif">routes *</text>
+</svg>

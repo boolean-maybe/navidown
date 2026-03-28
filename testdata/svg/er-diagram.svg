@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 440" font-family="Consolas, monospace">
+  <defs>
+    <marker id="er-one" markerWidth="12" markerHeight="12" refX="12" refY="6" orient="auto">
+      <line x1="10" y1="1" x2="10" y2="11" stroke="#555" stroke-width="1.5"/>
+    </marker>
+    <marker id="er-many" markerWidth="14" markerHeight="12" refX="14" refY="6" orient="auto">
+      <polyline points="2 1, 14 6, 2 11" fill="none" stroke="#555" stroke-width="1.5"/>
+    </marker>
+  </defs>
+
+  <text x="350" y="26" text-anchor="middle" font-size="16" font-weight="bold" fill="#333" font-family="Segoe UI, sans-serif">Entity Relationship — E-Commerce</text>
+
+  <!-- Customer -->
+  <rect x="30" y="50" width="200" height="130" rx="4" fill="#E3F2FD" stroke="#1565C0" stroke-width="1.5"/>
+  <rect x="30" y="50" width="200" height="28" rx="4" fill="#1565C0"/>
+  <text x="130" y="69" text-anchor="middle" font-size="13" font-weight="bold" fill="white">Customer</text>
+  <text x="40" y="96" font-size="11" font-weight="bold" fill="#0a0a2d">PK  id          INT</text>
+  <text x="40" y="112" font-size="11" font-weight="bold" fill="#0a0a2d">    email       VARCHAR(255)</text>
+  <text x="40" y="128" font-size="11" font-weight="bold" fill="#0a0a2d">    name        VARCHAR(100)</text>
+  <text x="40" y="144" font-size="11" font-weight="bold" fill="#0a0a2d">    created_at  TIMESTAMP</text>
+  <text x="40" y="160" font-size="11" font-weight="bold" fill="#0a0a2d">    tier        ENUM</text>
+
+  <!-- Order -->
+  <rect x="30" y="230" width="200" height="130" rx="4" fill="#FFF3E0" stroke="#E65100" stroke-width="1.5"/>
+  <rect x="30" y="230" width="200" height="28" rx="4" fill="#E65100"/>
+  <text x="130" y="249" text-anchor="middle" font-size="13" font-weight="bold" fill="white">Order</text>
+  <text x="40" y="276" font-size="11" font-weight="bold" fill="#0a0a2d">PK  id          INT</text>
+  <text x="40" y="292" font-size="11" font-weight="bold" fill="#0a0a2d">FK  customer_id INT</text>
+  <text x="40" y="308" font-size="11" font-weight="bold" fill="#0a0a2d">    status      VARCHAR(50)</text>
+  <text x="40" y="324" font-size="11" font-weight="bold" fill="#0a0a2d">    total       DECIMAL</text>
+  <text x="40" y="340" font-size="11" font-weight="bold" fill="#0a0a2d">    ordered_at  TIMESTAMP</text>
+
+  <!-- OrderItem -->
+  <rect x="310" y="230" width="200" height="110" rx="4" fill="#E8F5E9" stroke="#2E7D32" stroke-width="1.5"/>
+  <rect x="310" y="230" width="200" height="28" rx="4" fill="#2E7D32"/>
+  <text x="410" y="249" text-anchor="middle" font-size="13" font-weight="bold" fill="white">OrderItem</text>
+  <text x="320" y="276" font-size="11" font-weight="bold" fill="#0a0a2d">PK  id          INT</text>
+  <text x="320" y="292" font-size="11" font-weight="bold" fill="#0a0a2d">FK  order_id    INT</text>
+  <text x="320" y="308" font-size="11" font-weight="bold" fill="#0a0a2d">FK  product_id  INT</text>
+  <text x="320" y="324" font-size="11" font-weight="bold" fill="#0a0a2d">    quantity    INT</text>
+
+  <!-- Product -->
+  <rect x="470" y="50" width="200" height="130" rx="4" fill="#F3E5F5" stroke="#7B1FA2" stroke-width="1.5"/>
+  <rect x="470" y="50" width="200" height="28" rx="4" fill="#7B1FA2"/>
+  <text x="570" y="69" text-anchor="middle" font-size="13" font-weight="bold" fill="white">Product</text>
+  <text x="480" y="96" font-size="11" font-weight="bold" fill="#0a0a2d">PK  id          INT</text>
+  <text x="480" y="112" font-size="11" font-weight="bold" fill="#0a0a2d">    name        VARCHAR(200)</text>
+  <text x="480" y="128" font-size="11" font-weight="bold" fill="#0a0a2d">    price       DECIMAL</text>
+  <text x="480" y="144" font-size="11" font-weight="bold" fill="#0a0a2d">FK  category_id INT</text>
+  <text x="480" y="160" font-size="11" font-weight="bold" fill="#0a0a2d">    sku         VARCHAR(50)</text>
+
+  <!-- Category -->
+  <rect x="470" y="310" width="200" height="110" rx="4" fill="#FFF9C4" stroke="#F9A825" stroke-width="1.5"/>
+  <rect x="470" y="310" width="200" height="28" rx="4" fill="#F9A825"/>
+  <text x="570" y="329" text-anchor="middle" font-size="13" font-weight="bold" fill="white">Category</text>
+  <text x="480" y="356" font-size="11" font-weight="bold" fill="#0a0a2d">PK  id          INT</text>
+  <text x="480" y="372" font-size="11" font-weight="bold" fill="#0a0a2d">    name        VARCHAR(100)</text>
+  <text x="480" y="388" font-size="11" font-weight="bold" fill="#0a0a2d">    slug        VARCHAR(100)</text>
+  <text x="480" y="404" font-size="11" font-weight="bold" fill="#0a0a2d">FK  parent_id   INT</text>
+
+  <!-- relationships -->
+  <!-- Customer 1 to many Order -->
+  <line x1="130" y1="180" x2="130" y2="228" stroke="#555" stroke-width="1.5"/>
+  <text x="138" y="195" font-size="10" fill="#666" font-family="Segoe UI, sans-serif">1</text>
+  <text x="138" y="223" font-size="10" fill="#666" font-family="Segoe UI, sans-serif">*</text>
+
+  <!-- Order 1 to many OrderItem -->
+  <line x1="230" y1="285" x2="308" y2="285" stroke="#555" stroke-width="1.5"/>
+  <text x="240" y="279" font-size="10" fill="#666" font-family="Segoe UI, sans-serif">1</text>
+  <text x="296" y="279" font-size="10" fill="#666" font-family="Segoe UI, sans-serif">*</text>
+
+  <!-- OrderItem many to 1 Product -->
+  <line x1="475" y1="260" x2="510" y2="260" stroke="#555" stroke-width="0.5"/>
+  <line x1="510" y1="260" x2="570" y2="182" stroke="#555" stroke-width="1.5"/>
+  <text x="515" y="255" font-size="10" fill="#666" font-family="Segoe UI, sans-serif">*</text>
+  <text x="560" y="196" font-size="10" fill="#666" font-family="Segoe UI, sans-serif">1</text>
+
+  <!-- Product many to 1 Category -->
+  <line x1="570" y1="180" x2="570" y2="308" stroke="#555" stroke-width="1.5"/>
+  <text x="578" y="200" font-size="10" fill="#666" font-family="Segoe UI, sans-serif">*</text>
+  <text x="578" y="304" font-size="10" fill="#666" font-family="Segoe UI, sans-serif">1</text>
+</svg>

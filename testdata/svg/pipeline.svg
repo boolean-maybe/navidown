@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="pipe-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#555"/>
+    </marker>
+    <linearGradient id="stage-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff"/>
+      <stop offset="100%" stop-color="#f5f5f5"/>
+    </linearGradient>
+  </defs>
+
+  <text x="380" y="26" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">CI/CD Pipeline</text>
+
+  <!-- stage 1: Source -->
+  <rect x="20" y="50" width="120" height="200" rx="6" fill="url(#stage-grad)" stroke="#1565C0" stroke-width="1.5"/>
+  <rect x="20" y="50" width="120" height="30" rx="6" fill="#1565C0"/>
+  <rect x="20" y="65" width="120" height="15" fill="#1565C0"/>
+  <text x="80" y="70" text-anchor="middle" font-size="12" font-weight="bold" fill="white">Source</text>
+  <rect x="32" y="92" width="96" height="28" rx="4" fill="#E3F2FD" stroke="#90CAF9" stroke-width="1"/>
+  <text x="80" y="111" text-anchor="middle" font-size="10" fill="#1565C0">Git Push</text>
+  <rect x="32" y="130" width="96" height="28" rx="4" fill="#E3F2FD" stroke="#90CAF9" stroke-width="1"/>
+  <text x="80" y="149" text-anchor="middle" font-size="10" fill="#1565C0">PR Webhook</text>
+  <circle cx="80" cy="220" r="12" fill="#4CAF50" stroke="#2E7D32" stroke-width="1.5"/>
+  <text x="80" y="224" text-anchor="middle" font-size="14" fill="white">&#x2713;</text>
+
+  <!-- stage 2: Build -->
+  <rect x="170" y="50" width="120" height="200" rx="6" fill="url(#stage-grad)" stroke="#E65100" stroke-width="1.5"/>
+  <rect x="170" y="50" width="120" height="30" rx="6" fill="#E65100"/>
+  <rect x="170" y="65" width="120" height="15" fill="#E65100"/>
+  <text x="230" y="70" text-anchor="middle" font-size="12" font-weight="bold" fill="white">Build</text>
+  <rect x="182" y="92" width="96" height="28" rx="4" fill="#FFF3E0" stroke="#FFCC80" stroke-width="1"/>
+  <text x="230" y="111" text-anchor="middle" font-size="10" fill="#E65100">Compile</text>
+  <rect x="182" y="130" width="96" height="28" rx="4" fill="#FFF3E0" stroke="#FFCC80" stroke-width="1"/>
+  <text x="230" y="149" text-anchor="middle" font-size="10" fill="#E65100">Lint</text>
+  <rect x="182" y="168" width="96" height="28" rx="4" fill="#FFF3E0" stroke="#FFCC80" stroke-width="1"/>
+  <text x="230" y="187" text-anchor="middle" font-size="10" fill="#E65100">Docker Image</text>
+  <circle cx="230" cy="220" r="12" fill="#4CAF50" stroke="#2E7D32" stroke-width="1.5"/>
+  <text x="230" y="224" text-anchor="middle" font-size="14" fill="white">&#x2713;</text>
+
+  <!-- stage 3: Test -->
+  <rect x="320" y="50" width="120" height="200" rx="6" fill="url(#stage-grad)" stroke="#2E7D32" stroke-width="1.5"/>
+  <rect x="320" y="50" width="120" height="30" rx="6" fill="#2E7D32"/>
+  <rect x="320" y="65" width="120" height="15" fill="#2E7D32"/>
+  <text x="380" y="70" text-anchor="middle" font-size="12" font-weight="bold" fill="white">Test</text>
+  <rect x="332" y="92" width="96" height="28" rx="4" fill="#E8F5E9" stroke="#A5D6A7" stroke-width="1"/>
+  <text x="380" y="111" text-anchor="middle" font-size="10" fill="#2E7D32">Unit Tests</text>
+  <rect x="332" y="130" width="96" height="28" rx="4" fill="#E8F5E9" stroke="#A5D6A7" stroke-width="1"/>
+  <text x="380" y="149" text-anchor="middle" font-size="10" fill="#2E7D32">Integration</text>
+  <rect x="332" y="168" width="96" height="28" rx="4" fill="#E8F5E9" stroke="#A5D6A7" stroke-width="1"/>
+  <text x="380" y="187" text-anchor="middle" font-size="10" fill="#2E7D32">Coverage</text>
+  <circle cx="380" cy="220" r="12" fill="#FF9800" stroke="#E65100" stroke-width="1.5"/>
+  <text x="380" y="225" text-anchor="middle" font-size="11" font-weight="bold" fill="white">...</text>
+
+  <!-- stage 4: Staging -->
+  <rect x="470" y="50" width="120" height="200" rx="6" fill="url(#stage-grad)" stroke="#7B1FA2" stroke-width="1.5"/>
+  <rect x="470" y="50" width="120" height="30" rx="6" fill="#7B1FA2"/>
+  <rect x="470" y="65" width="120" height="15" fill="#7B1FA2"/>
+  <text x="530" y="70" text-anchor="middle" font-size="12" font-weight="bold" fill="white">Staging</text>
+  <rect x="482" y="92" width="96" height="28" rx="4" fill="#F3E5F5" stroke="#CE93D8" stroke-width="1"/>
+  <text x="530" y="111" text-anchor="middle" font-size="10" fill="#7B1FA2">Deploy</text>
+  <rect x="482" y="130" width="96" height="28" rx="4" fill="#F3E5F5" stroke="#CE93D8" stroke-width="1"/>
+  <text x="530" y="149" text-anchor="middle" font-size="10" fill="#7B1FA2">Smoke Tests</text>
+  <rect x="482" y="168" width="96" height="28" rx="4" fill="#F3E5F5" stroke="#CE93D8" stroke-width="1"/>
+  <text x="530" y="187" text-anchor="middle" font-size="10" fill="#7B1FA2">Approval Gate</text>
+  <circle cx="530" cy="220" r="12" fill="#9E9E9E" stroke="#616161" stroke-width="1.5"/>
+  <text x="530" y="224" text-anchor="middle" font-size="11" fill="white">&#x23F8;</text>
+
+  <!-- stage 5: Production -->
+  <rect x="620" y="50" width="120" height="200" rx="6" fill="url(#stage-grad)" stroke="#C62828" stroke-width="1.5"/>
+  <rect x="620" y="50" width="120" height="30" rx="6" fill="#C62828"/>
+  <rect x="620" y="65" width="120" height="15" fill="#C62828"/>
+  <text x="680" y="70" text-anchor="middle" font-size="12" font-weight="bold" fill="white">Production</text>
+  <rect x="632" y="92" width="96" height="28" rx="4" fill="#FFEBEE" stroke="#EF9A9A" stroke-width="1"/>
+  <text x="680" y="111" text-anchor="middle" font-size="10" fill="#C62828">Blue/Green</text>
+  <rect x="632" y="130" width="96" height="28" rx="4" fill="#FFEBEE" stroke="#EF9A9A" stroke-width="1"/>
+  <text x="680" y="149" text-anchor="middle" font-size="10" fill="#C62828">Health Check</text>
+  <rect x="632" y="168" width="96" height="28" rx="4" fill="#FFEBEE" stroke="#EF9A9A" stroke-width="1"/>
+  <text x="680" y="187" text-anchor="middle" font-size="10" fill="#C62828">Rollback</text>
+  <circle cx="680" cy="220" r="12" fill="#9E9E9E" stroke="#616161" stroke-width="1.5"/>
+
+  <!-- arrows between stages -->
+  <line x1="140" y1="150" x2="168" y2="150" stroke="#555" stroke-width="2" marker-end="url(#pipe-arrow)"/>
+  <line x1="290" y1="150" x2="318" y2="150" stroke="#555" stroke-width="2" marker-end="url(#pipe-arrow)"/>
+  <line x1="440" y1="150" x2="468" y2="150" stroke="#555" stroke-width="2" marker-end="url(#pipe-arrow)"/>
+  <line x1="590" y1="150" x2="618" y2="150" stroke="#555" stroke-width="2" marker-end="url(#pipe-arrow)"/>
+
+  <!-- bottom status bar -->
+  <rect x="20" y="265" width="720" height="24" rx="4" fill="#ECEFF1"/>
+  <text x="380" y="282" text-anchor="middle" font-size="11" fill="#555">Pipeline #1847 — triggered by push to main — 3/5 stages complete</text>
+</svg>

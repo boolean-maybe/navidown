@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 440" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="seq-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#333"/>
+    </marker>
+    <marker id="seq-arrow-open" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polyline points="0 0, 8 3, 0 6" fill="none" stroke="#333" stroke-width="1"/>
+    </marker>
+  </defs>
+
+  <text x="300" y="24" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">REST API Request Flow</text>
+
+  <!-- lifeline headers -->
+  <rect x="30" y="40" width="90" height="32" rx="4" fill="#E3F2FD" stroke="#1565C0" stroke-width="1.5"/>
+  <text x="75" y="61" text-anchor="middle" font-size="12" fill="#1565C0">Client</text>
+
+  <rect x="180" y="40" width="90" height="32" rx="4" fill="#FFF3E0" stroke="#E65100" stroke-width="1.5"/>
+  <text x="225" y="61" text-anchor="middle" font-size="12" fill="#E65100">Controller</text>
+
+  <rect x="330" y="40" width="90" height="32" rx="4" fill="#E8F5E9" stroke="#2E7D32" stroke-width="1.5"/>
+  <text x="375" y="61" text-anchor="middle" font-size="12" fill="#2E7D32">Service</text>
+
+  <rect x="480" y="40" width="90" height="32" rx="4" fill="#FFF9C4" stroke="#F9A825" stroke-width="1.5"/>
+  <text x="525" y="61" text-anchor="middle" font-size="12" fill="#F57F17">Repository</text>
+
+  <!-- lifelines -->
+  <line x1="75" y1="72" x2="75" y2="420" stroke="#999" stroke-width="1" stroke-dasharray="4 3"/>
+  <line x1="225" y1="72" x2="225" y2="420" stroke="#999" stroke-width="1" stroke-dasharray="4 3"/>
+  <line x1="375" y1="72" x2="375" y2="420" stroke="#999" stroke-width="1" stroke-dasharray="4 3"/>
+  <line x1="525" y1="72" x2="525" y2="420" stroke="#999" stroke-width="1" stroke-dasharray="4 3"/>
+
+  <!-- activation bars -->
+  <rect x="71" y="95" width="8" height="290" fill="#BBDEFB" stroke="#1565C0" stroke-width="0.5"/>
+  <rect x="221" y="110" width="8" height="250" fill="#FFE0B2" stroke="#E65100" stroke-width="0.5"/>
+  <rect x="371" y="150" width="8" height="170" fill="#C8E6C9" stroke="#2E7D32" stroke-width="0.5"/>
+  <rect x="521" y="195" width="8" height="80" fill="#FFF9C4" stroke="#F9A825" stroke-width="0.5"/>
+
+  <!-- messages -->
+  <!-- 1: POST /api/users -->
+  <line x1="79" y1="110" x2="221" y2="110" stroke="#333" stroke-width="1.5" marker-end="url(#seq-arrow)"/>
+  <text x="150" y="105" text-anchor="middle" font-size="10" fill="#333">POST /api/users</text>
+
+  <!-- 2: validate + call service -->
+  <line x1="229" y1="150" x2="371" y2="150" stroke="#333" stroke-width="1.5" marker-end="url(#seq-arrow)"/>
+  <text x="300" y="145" text-anchor="middle" font-size="10" fill="#333">createUser(dto)</text>
+
+  <!-- 3: check exists -->
+  <line x1="379" y1="195" x2="521" y2="195" stroke="#333" stroke-width="1.5" marker-end="url(#seq-arrow)"/>
+  <text x="450" y="190" text-anchor="middle" font-size="10" fill="#333">findByEmail()</text>
+
+  <!-- 4: null -->
+  <line x1="521" y1="230" x2="379" y2="230" stroke="#333" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#seq-arrow-open)"/>
+  <text x="450" y="225" text-anchor="middle" font-size="10" fill="#888">null</text>
+
+  <!-- 5: save -->
+  <line x1="379" y1="260" x2="521" y2="260" stroke="#333" stroke-width="1.5" marker-end="url(#seq-arrow)"/>
+  <text x="450" y="255" text-anchor="middle" font-size="10" fill="#333">save(user)</text>
+
+  <!-- 6: saved entity -->
+  <line x1="521" y1="290" x2="379" y2="290" stroke="#333" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#seq-arrow-open)"/>
+  <text x="450" y="285" text-anchor="middle" font-size="10" fill="#888">User entity</text>
+
+  <!-- 7: return user -->
+  <line x1="371" y1="330" x2="229" y2="330" stroke="#333" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#seq-arrow-open)"/>
+  <text x="300" y="325" text-anchor="middle" font-size="10" fill="#888">UserResponse</text>
+
+  <!-- 8: 201 Created -->
+  <line x1="221" y1="370" x2="79" y2="370" stroke="#333" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#seq-arrow-open)"/>
+  <text x="150" y="365" text-anchor="middle" font-size="10" fill="#888">201 Created + JSON</text>
+
+  <!-- footer boxes -->
+  <rect x="30" y="408" width="90" height="24" rx="4" fill="#E3F2FD" stroke="#1565C0" stroke-width="1"/>
+  <text x="75" y="424" text-anchor="middle" font-size="11" fill="#1565C0">Client</text>
+  <rect x="180" y="408" width="90" height="24" rx="4" fill="#FFF3E0" stroke="#E65100" stroke-width="1"/>
+  <text x="225" y="424" text-anchor="middle" font-size="11" fill="#E65100">Controller</text>
+  <rect x="330" y="408" width="90" height="24" rx="4" fill="#E8F5E9" stroke="#2E7D32" stroke-width="1"/>
+  <text x="375" y="424" text-anchor="middle" font-size="11" fill="#2E7D32">Service</text>
+  <rect x="480" y="408" width="90" height="24" rx="4" fill="#FFF9C4" stroke="#F9A825" stroke-width="1"/>
+  <text x="525" y="424" text-anchor="middle" font-size="11" fill="#F57F17">Repository</text>
+</svg>

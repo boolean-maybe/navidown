@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 420" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="dep-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#555"/>
+    </marker>
+    <filter id="dshadow" x="-2%" y="-2%" width="104%" height="108%">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <text x="350" y="26" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">Kubernetes Deployment</text>
+
+  <!-- Cloud boundary -->
+  <rect x="15" y="40" width="670" height="370" rx="12" fill="none" stroke="#90CAF9" stroke-width="2" stroke-dasharray="8 4"/>
+  <text x="350" y="60" text-anchor="middle" font-size="12" fill="#1565C0">Cloud Provider (AWS / GCP)</text>
+
+  <!-- Cluster boundary -->
+  <rect x="35" y="70" width="630" height="320" rx="8" fill="#F5F5F5" stroke="#78909C" stroke-width="1.5"/>
+  <text x="350" y="90" text-anchor="middle" font-size="12" fill="#455A64">Kubernetes Cluster</text>
+
+  <!-- Ingress -->
+  <rect x="270" y="100" width="160" height="36" rx="6" fill="#E3F2FD" stroke="#1565C0" stroke-width="1.5" filter="url(#dshadow)"/>
+  <text x="350" y="123" text-anchor="middle" font-size="12" fill="#1565C0">Ingress Controller</text>
+
+  <!-- Service -->
+  <rect x="270" y="170" width="160" height="36" rx="6" fill="#FFF3E0" stroke="#E65100" stroke-width="1.5" filter="url(#dshadow)"/>
+  <text x="350" y="193" text-anchor="middle" font-size="12" fill="#E65100">Service (ClusterIP)</text>
+
+  <!-- Pods -->
+  <g>
+    <rect x="55" y="245" width="130" height="60" rx="6" fill="#E8F5E9" stroke="#2E7D32" stroke-width="1.5" filter="url(#dshadow)"/>
+    <text x="120" y="269" text-anchor="middle" font-size="11" font-weight="bold" fill="#2E7D32">Pod 1</text>
+    <text x="120" y="285" text-anchor="middle" font-size="9" fill="#555">app:v2.1 | 256Mi</text>
+    <circle cx="170" cy="252" r="5" fill="#4CAF50"/>
+  </g>
+  <g>
+    <rect x="210" y="245" width="130" height="60" rx="6" fill="#E8F5E9" stroke="#2E7D32" stroke-width="1.5" filter="url(#dshadow)"/>
+    <text x="275" y="269" text-anchor="middle" font-size="11" font-weight="bold" fill="#2E7D32">Pod 2</text>
+    <text x="275" y="285" text-anchor="middle" font-size="9" fill="#555">app:v2.1 | 256Mi</text>
+    <circle cx="325" cy="252" r="5" fill="#4CAF50"/>
+  </g>
+  <g>
+    <rect x="365" y="245" width="130" height="60" rx="6" fill="#E8F5E9" stroke="#2E7D32" stroke-width="1.5" filter="url(#dshadow)"/>
+    <text x="430" y="269" text-anchor="middle" font-size="11" font-weight="bold" fill="#2E7D32">Pod 3</text>
+    <text x="430" y="285" text-anchor="middle" font-size="9" fill="#555">app:v2.1 | 256Mi</text>
+    <circle cx="480" cy="252" r="5" fill="#4CAF50"/>
+  </g>
+
+  <!-- Sidecar / ConfigMap -->
+  <rect x="530" y="245" width="120" height="60" rx="6" fill="#F3E5F5" stroke="#7B1FA2" stroke-width="1.5" filter="url(#dshadow)"/>
+  <text x="590" y="269" text-anchor="middle" font-size="11" font-weight="bold" fill="#7B1FA2">ConfigMap</text>
+  <text x="590" y="285" text-anchor="middle" font-size="9" fill="#555">env / secrets ref</text>
+
+  <!-- PVC -->
+  <rect x="55" y="340" width="180" height="36" rx="6" fill="#FFF9C4" stroke="#F9A825" stroke-width="1.5" filter="url(#dshadow)"/>
+  <text x="145" y="363" text-anchor="middle" font-size="11" fill="#F57F17">PersistentVolumeClaim</text>
+
+  <!-- External DB -->
+  <rect x="320" y="340" width="180" height="36" rx="6" fill="#FFEBEE" stroke="#C62828" stroke-width="1.5" filter="url(#dshadow)"/>
+  <text x="410" y="363" text-anchor="middle" font-size="11" fill="#C62828">RDS (PostgreSQL)</text>
+
+  <!-- HPA -->
+  <rect x="530" y="340" width="120" height="36" rx="6" fill="#ECEFF1" stroke="#455A64" stroke-width="1.5" filter="url(#dshadow)"/>
+  <text x="590" y="363" text-anchor="middle" font-size="11" fill="#455A64">HPA (3-10)</text>
+
+  <!-- arrows -->
+  <line x1="350" y1="136" x2="350" y2="168" stroke="#555" stroke-width="1.5" marker-end="url(#dep-arrow)"/>
+  <line x1="300" y1="206" x2="120" y2="243" stroke="#555" stroke-width="1.2" marker-end="url(#dep-arrow)"/>
+  <line x1="350" y1="206" x2="275" y2="243" stroke="#555" stroke-width="1.2" marker-end="url(#dep-arrow)"/>
+  <line x1="400" y1="206" x2="430" y2="243" stroke="#555" stroke-width="1.2" marker-end="url(#dep-arrow)"/>
+
+  <!-- pods to storage -->
+  <line x1="120" y1="305" x2="130" y2="338" stroke="#F9A825" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#dep-arrow)"/>
+  <line x1="275" y1="305" x2="380" y2="338" stroke="#C62828" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#dep-arrow)"/>
+  <line x1="430" y1="305" x2="410" y2="338" stroke="#C62828" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#dep-arrow)"/>
+
+  <!-- configmap to pods -->
+  <line x1="530" y1="275" x2="497" y2="275" stroke="#7B1FA2" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#dep-arrow)"/>
+</svg>
