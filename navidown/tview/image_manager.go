@@ -28,6 +28,7 @@ type ImageManager struct {
 	idToInfo    map[uint32]*nav.ImageInfo
 	idToDisplay map[uint32]imageDisplay
 	supported   *bool // nil = unknown, pointer to bool = detected
+	purgedStale bool  // true after initial purge of stale Kitty images
 	resolver    *nav.ImageResolver
 	cellWidth   int
 	cellHeight  int
@@ -223,6 +224,16 @@ func (m *ImageManager) ResolveAndAllocate(url, sourceFilePath string, maxCols in
 // transmission to stay within Kitty's 320MB RGBA storage quota.
 func (m *ImageManager) EnsureTransmitted(screen tcell.Screen, id uint32) {
 	m.mu.Lock()
+	// on first transmission, purge any stale images left in Kitty's cache
+	// from previous runs. Without this, Kitty may serve a cached image under
+	// the same ID instead of accepting the newly transmitted data.
+	if !m.purgedStale {
+		m.purgedStale = true
+		m.mu.Unlock()
+		m.DeleteAll(screen)
+		m.mu.Lock()
+	}
+
 	if m.transmitted[id] {
 		m.mu.Unlock()
 		return
@@ -242,13 +253,16 @@ func (m *ImageManager) EnsureTransmitted(screen tcell.Screen, id uint32) {
 
 	cols, rows := display.cols, display.rows
 
-	// Downscale to the display grid pixel dimensions.
+	// Downscale to 2x the display grid pixel dimensions.
 	// Kitty decodes transmitted images to uncompressed RGBA in GPU memory
 	// (width * height * 4 bytes). The default storage quota is 320MB.
 	// Without downscaling, a 6124x5470 image uses ~128MB even if displayed
 	// in an 80x40 cell grid that only needs ~640x640 pixels.
-	targetW := cols * m.cellWidth
-	targetH := rows * m.cellHeight
+	// Using 2x ensures Kitty always downscales (never upscales), which
+	// avoids edge clipping when cellWidth is inaccurate (e.g. the default
+	// 8px when the terminal doesn't report pixel dimensions).
+	targetW := cols * m.cellWidth * 2
+	targetH := rows * m.cellHeight * 2
 	data := info.Data
 	if targetW > 0 && targetH > 0 && (info.Width > targetW || info.Height > targetH) {
 		if resized, err := info.ResizedPNG(targetW, targetH); err == nil {
