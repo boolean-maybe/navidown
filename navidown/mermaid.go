@@ -84,7 +84,7 @@ func (o *MermaidOptions) resolvedTimeout() time.Duration {
 	if o.Timeout > 0 {
 		return o.Timeout
 	}
-	return 30 * time.Second
+	return 60 * time.Second
 }
 
 // resolvedConfigData returns the embedded default config JSON with the theme
@@ -95,7 +95,7 @@ func (o *MermaidOptions) resolvedConfigData() []byte {
 
 // classConfigData returns config JSON with fontSize for class diagrams.
 func (o *MermaidOptions) classConfigData() []byte {
-	return configDataWithFontSize(o.resolvedTheme(), "10px")
+	return configDataWithFontSize(o.resolvedTheme(), "6px")
 }
 
 // stateConfigData returns config JSON with fontSize for state diagrams.
@@ -357,13 +357,14 @@ func NewMermaidRenderer(opts MermaidOptions) *MermaidRenderer {
 type diagramFontTier int
 
 const (
-	tierDefault diagramFontTier = iota // flowchart, sequence — compact 8px
-	tierClass                          // class diagram — medium 10px
-	tierState                          // state diagram — 36px config for box sizing, 20px visible text
-	tierLarge                          // ER diagram — large 18px
-	tierGantt                          // gantt — compact bars with smaller task/section fonts
-	tierPie                            // pie — colorful slices with white borders
-	tierGit                            // gitGraph — SVG post-processed for thin lines/circles
+	tierDefault  diagramFontTier = iota // flowchart + other — compact 8px
+	tierSequence                        // sequence diagram — skip two-pass (wide natural width makes text tiny)
+	tierClass                           // class diagram — medium 10px
+	tierState                           // state diagram — 36px config for box sizing, 20px visible text
+	tierLarge                           // ER diagram — large 18px
+	tierGantt                           // gantt — compact bars with smaller task/section fonts
+	tierPie                             // pie — colorful slices with white borders
+	tierGit                             // gitGraph — SVG post-processed for thin lines/circles
 )
 
 // fontTier returns the font size tier for the given mermaid source.
@@ -372,6 +373,9 @@ func fontTier(source string) diagramFontTier {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "%%") {
 			continue
+		}
+		if strings.HasPrefix(trimmed, "sequenceDiagram") {
+			return tierSequence
 		}
 		if strings.HasPrefix(trimmed, "classDiagram") {
 			return tierClass
@@ -446,7 +450,7 @@ func (r *MermaidRenderer) configForSource(source string) (configPath, cssPath st
 // (theme, background, scale) so that option changes don't produce stale hits.
 // cacheVersion must be bumped when post-processing logic changes, since
 // post-processing runs after the cache key is computed from inputs.
-const cacheVersion = "v5"
+const cacheVersion = "v14"
 
 func (r *MermaidRenderer) cacheKey(source string) string {
 	h := sha256.New()
@@ -490,6 +494,16 @@ func (r *MermaidRenderer) cacheKey(source string) string {
 	_, _ = fmt.Fprintf(h, "%d", r.opts.resolvedScale())
 	h.Write([]byte{0})
 	_, _ = fmt.Fprintf(h, "%d", r.widthForSource(source))
+	h.Write([]byte{0})
+	if r.resvgPath != "" {
+		h.Write([]byte("resvg"))
+	} else {
+		h.Write([]byte("mmdc"))
+	}
+	// include "twopass" marker so natural-width renders don't collide with
+	// fixed-width cached PNGs from older versions
+	h.Write([]byte{0})
+	h.Write([]byte("twopass"))
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
@@ -525,6 +539,7 @@ func (r *MermaidRenderer) RenderToFile(source string) (string, error) {
 
 	// gitGraph requires SVG post-processing + resvg because mmdc's Puppeteer
 	// ignores CSS overrides for SVG attributes (circle r, stroke-width).
+	// resvg works for gitGraph since it uses <text> elements, not foreignObject.
 	if fontTier(source) == tierGit && r.resvgPath != "" {
 		pngPath, err := r.renderViaResvg(ctx, inputPath, outputPath, cfgPath, css, source)
 		if err != nil {
@@ -535,13 +550,18 @@ func (r *MermaidRenderer) RenderToFile(source string) (string, error) {
 		return pngPath, nil
 	}
 
+	// two-pass rendering: first render to SVG to discover the diagram's
+	// natural width, then render to PNG at that width so Puppeteer doesn't
+	// shrink large diagrams to fit a narrow viewport.
+	width := r.naturalWidth(ctx, inputPath, cfgPath, css, source)
+
 	cmd := exec.CommandContext(ctx, r.mmdcPath, // #nosec G204 -- mmdcPath from LookPath("mmdc") or user-provided
 		"-i", inputPath,
 		"-o", outputPath,
 		"-c", cfgPath,
 		"-C", css,
 		"-b", r.opts.resolvedBackground(),
-		"-w", fmt.Sprintf("%d", r.widthForSource(source)),
+		"-w", fmt.Sprintf("%d", width),
 		"-s", fmt.Sprintf("%d", r.opts.resolvedScale()),
 	)
 
@@ -559,7 +579,8 @@ func (r *MermaidRenderer) RenderToFile(source string) (string, error) {
 
 // renderViaResvg renders mermaid source to SVG via mmdc, post-processes the SVG
 // to fix attributes that CSS cannot override (circle radii, stroke widths),
-// then rasterizes to PNG via resvg.
+// then rasterizes to PNG via resvg. Only used for gitGraph (which uses <text>
+// elements); most diagram types use foreignObject/HTML that resvg can't render.
 func (r *MermaidRenderer) renderViaResvg(ctx context.Context, inputPath, outputPath, cfgPath, css, source string) (string, error) {
 	svgPath := strings.TrimSuffix(outputPath, ".png") + ".svg"
 
@@ -586,7 +607,7 @@ func (r *MermaidRenderer) renderViaResvg(ctx context.Context, inputPath, outputP
 	svgData = postProcessGitSVG(svgData)
 
 	// rasterize with resvg at 1.5x for a compact but readable result
-	_, vbW, ok := extractSVGViewBoxWidth(svgData)
+	vbW, ok := extractSVGViewBoxWidth(svgData)
 	targetWidth := r.widthForSource(source) * 3 / 2
 	if ok && vbW > 0 {
 		targetWidth = int(vbW) * 3 / 2
@@ -654,18 +675,82 @@ func patchGitStyles(s string) string {
 }
 
 // extractSVGViewBoxWidth extracts the viewBox width from SVG data.
-func extractSVGViewBoxWidth(svg []byte) (string, float64, bool) {
+func extractSVGViewBoxWidth(svg []byte) (float64, bool) {
 	// quick regex to find viewBox="minX minY width height"
 	re := regexp.MustCompile(`viewBox="[^"]*\s+([\d.]+)\s+[\d.]+"`)
 	m := re.FindSubmatch(svg)
 	if m == nil {
-		return "", 0, false
+		return 0, false
 	}
 	w, err := strconv.ParseFloat(string(m[1]), 64)
 	if err != nil {
-		return "", 0, false
+		return 0, false
 	}
-	return string(m[1]), w, true
+	return w, true
+}
+
+// extractSVGMaxWidth extracts the max-width value from an SVG style attribute.
+// Mermaid outputs style="max-width: 1906px; ..." which is the diagram's natural width.
+var svgMaxWidthRe = regexp.MustCompile(`max-width:\s*([\d.]+)px`)
+
+func extractSVGMaxWidth(svg []byte) (int, bool) {
+	m := svgMaxWidthRe.FindSubmatch(svg)
+	if m == nil {
+		return 0, false
+	}
+	w, err := strconv.ParseFloat(string(m[1]), 64)
+	if err != nil || w <= 0 {
+		return 0, false
+	}
+	return int(w), true
+}
+
+// naturalWidth renders mermaid source to SVG to discover the diagram's natural
+// width. Returns the width in CSS pixels, or falls back to widthForSource().
+func (r *MermaidRenderer) naturalWidth(_ context.Context, inputPath, cfgPath, css, source string) int {
+	svgPath := inputPath + ".probe.svg"
+	defer func() { _ = os.Remove(svgPath) }()
+
+	probeCtx, probeCancel := context.WithTimeout(context.Background(), r.opts.resolvedTimeout())
+	defer probeCancel()
+
+	cmd := exec.CommandContext(probeCtx, r.mmdcPath, // #nosec G204
+		"-i", inputPath,
+		"-o", svgPath,
+		"-c", cfgPath,
+		"-C", css,
+		"-b", r.opts.resolvedBackground(),
+		"-w", fmt.Sprintf("%d", r.widthForSource(source)),
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		_ = out
+		return r.widthForSource(source)
+	}
+
+	svgData, err := os.ReadFile(svgPath)
+	if err != nil {
+		return r.widthForSource(source)
+	}
+
+	// compact cap: keep small diagrams tight (like the small flowchart at ~377px).
+	// Large diagrams that exceed the terminal pixel width render at natural width
+	// so Kitty scales them down to fill the terminal evenly.
+	const compactCap = 400
+	terminalPxWidth := 200 * 8 / r.opts.resolvedScale() // ~800px at scale 2
+
+	natural := 0
+	if w, ok := extractSVGMaxWidth(svgData); ok {
+		natural = w
+	} else if vbW, ok := extractSVGViewBoxWidth(svgData); ok && vbW > 0 {
+		natural = int(vbW)
+	}
+	if natural <= 0 {
+		return r.widthForSource(source)
+	}
+	if natural > terminalPxWidth {
+		return natural
+	}
+	return min(natural, compactCap)
 }
 
 // Close releases resources. Only removes the temp dir (if used as fallback).

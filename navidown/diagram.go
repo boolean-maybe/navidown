@@ -64,17 +64,23 @@ func extractDiagramBlocks(markdown string, fenceRe *regexp.Regexp) ([]string, []
 	return lines, blocks
 }
 
-// renderDiagramBlocks renders all blocks in parallel and returns a map of
-// block index → image path. Missing entries indicate render errors.
+// renderDiagramBlocks renders all blocks with limited concurrency and returns
+// a map of block index → image path. Missing entries indicate render errors.
+// Concurrency is capped to avoid overwhelming mmdc/Puppeteer with too many
+// simultaneous Chrome instances.
 func renderDiagramBlocks(blocks []diagramBlock, renderer DiagramRenderer) map[int]string {
 	results := make(map[int]string)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
+	sem := make(chan struct{}, 4)
+
 	for idx, block := range blocks {
 		wg.Add(1)
 		go func(idx int, source string) {
 			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
 			path, err := renderer.RenderToFile(source)
 			if err != nil {
 				return

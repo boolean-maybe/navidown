@@ -29,6 +29,8 @@ func newTestMermaidRenderer(t *testing.T) *MermaidRenderer {
 	if renderer == nil {
 		t.Fatal("NewMermaidRenderer returned nil")
 	}
+	// disable resvg path so the fake mmdc (which outputs PNG, not SVG) works
+	renderer.resvgPath = ""
 	t.Cleanup(renderer.Close)
 	return renderer
 }
@@ -223,6 +225,7 @@ func TestPreprocessMermaid_ErrorPreservesBlock(t *testing.T) {
 	if renderer == nil {
 		t.Fatal("NewMermaidRenderer returned nil")
 	}
+	renderer.resvgPath = ""
 	t.Cleanup(renderer.Close)
 
 	md := "```mermaid\ngraph TD\n    A-->B\n```\n"
@@ -488,6 +491,7 @@ func TestMermaidRenderer_DiskCache(t *testing.T) {
 	if r1 == nil {
 		t.Fatal("r1 is nil")
 	}
+	r1.resvgPath = ""
 	path1, err := r1.RenderToFile(source)
 	if err != nil {
 		t.Fatalf("r1 render: %v", err)
@@ -499,6 +503,7 @@ func TestMermaidRenderer_DiskCache(t *testing.T) {
 	if r2 == nil {
 		t.Fatal("r2 is nil")
 	}
+	r2.resvgPath = ""
 	path2, err := r2.RenderToFile(source)
 	if err != nil {
 		t.Fatalf("r2 render: %v", err)
@@ -509,13 +514,14 @@ func TestMermaidRenderer_DiskCache(t *testing.T) {
 		t.Errorf("paths differ: %q vs %q", path1, path2)
 	}
 
-	// counter should be 1 — mmdc was only called once
+	// counter should be 2 — mmdc called twice on first render (SVG probe
+	// for natural width + PNG render), then 0 on second render (disk cache hit)
 	data, err := os.ReadFile(counterPath)
 	if err != nil {
 		t.Fatalf("read counter: %v", err)
 	}
-	if strings.TrimSpace(string(data)) != "1" {
-		t.Errorf("mmdc was called %s times, expected 1", strings.TrimSpace(string(data)))
+	if strings.TrimSpace(string(data)) != "2" {
+		t.Errorf("mmdc was called %s times, expected 2", strings.TrimSpace(string(data)))
 	}
 }
 

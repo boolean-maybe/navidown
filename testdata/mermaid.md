@@ -15,6 +15,7 @@
 - [Sankey Diagram](#sankey-diagram)
 - [Block Diagram](#block-diagram)
 
+
 ## Flowchart
 
 ```mermaid
@@ -27,6 +28,55 @@ flowchart TD
     E --> B
     F --> B
     C --> G[Deploy]
+```
+
+## Large Flowchart
+
+```mermaid
+flowchart TD
+    A[User Request] --> B{Authenticated?}
+    B -->|No| C[Show Login]
+    C --> D[Enter Credentials]
+    D --> E{Valid?}
+    E -->|No| F[Show Error]
+    F --> D
+    E -->|Yes| G[Create Session]
+    G --> H[Load Profile]
+    B -->|Yes| H
+    H --> I{Role?}
+    I -->|Admin| J[Load Admin Dashboard]
+    I -->|User| K[Load User Dashboard]
+    I -->|Guest| L[Load Guest View]
+    J --> M[Fetch Analytics]
+    M --> N[Fetch User List]
+    N --> O[Fetch System Logs]
+    O --> P[Render Admin Panel]
+    K --> Q[Fetch User Data]
+    Q --> R[Fetch Notifications]
+    R --> S[Fetch Recommendations]
+    S --> T[Render User Panel]
+    L --> U[Fetch Public Content]
+    U --> V[Render Guest Panel]
+    P --> W{Action?}
+    T --> W
+    V --> W
+    W -->|Navigate| X[Route to Page]
+    X --> Y[Load Page Data]
+    Y --> Z[Render Page]
+    Z --> W
+    W -->|Logout| AA[Destroy Session]
+    AA --> A
+    W -->|API Call| AB[Validate Request]
+    AB --> AC{Rate Limited?}
+    AC -->|Yes| AD[Return 429]
+    AC -->|No| AE[Process Request]
+    AE --> AF{Success?}
+    AF -->|Yes| AG[Return Response]
+    AF -->|No| AH[Log Error]
+    AH --> AI[Return 500]
+    AG --> W
+    AD --> W
+    AI --> W
 ```
 
 ## Sequence Diagram
@@ -51,6 +101,80 @@ sequenceDiagram
     API->>DB: Fetch data
     DB-->>API: Results
     API-->>Client: 200 OK + data
+```
+
+## Large Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant CDN
+    participant Gateway
+    participant Auth
+    participant UserSvc
+    participant OrderSvc
+    participant PaymentSvc
+    participant Inventory
+    participant DB
+    participant Cache
+    participant Queue
+    participant Notify
+
+    Browser->>CDN: GET /app.js
+    CDN-->>Browser: Static assets
+
+    Browser->>Gateway: POST /auth/login
+    Gateway->>Auth: Validate credentials
+    Auth->>DB: SELECT user WHERE email=?
+    DB-->>Auth: User record
+    Auth->>Cache: SET session:token
+    Cache-->>Auth: OK
+    Auth-->>Gateway: JWT token
+    Gateway-->>Browser: 200 + JWT
+
+    Browser->>Gateway: GET /orders (JWT)
+    Gateway->>Auth: Verify token
+    Auth->>Cache: GET session:token
+    Cache-->>Auth: Session data
+    Auth-->>Gateway: Valid
+    Gateway->>OrderSvc: ListOrders(userId)
+    OrderSvc->>DB: SELECT orders WHERE user_id=?
+    DB-->>OrderSvc: Order records
+    OrderSvc->>Cache: GET order:details:*
+    Cache-->>OrderSvc: Cached details
+    OrderSvc-->>Gateway: Order list
+    Gateway-->>Browser: 200 + orders
+
+    Browser->>Gateway: POST /orders/new
+    Gateway->>Auth: Verify token
+    Auth-->>Gateway: Valid
+    Gateway->>OrderSvc: CreateOrder(items)
+    OrderSvc->>Inventory: CheckStock(items)
+    Inventory->>DB: SELECT stock WHERE product_id IN (?)
+    DB-->>Inventory: Stock levels
+    Inventory-->>OrderSvc: Stock confirmed
+
+    OrderSvc->>PaymentSvc: ChargeCard(amount)
+    PaymentSvc->>PaymentSvc: Validate card
+    PaymentSvc-->>OrderSvc: Payment authorized
+
+    OrderSvc->>DB: INSERT order
+    DB-->>OrderSvc: Order created
+    OrderSvc->>Inventory: ReserveStock(items)
+    Inventory->>DB: UPDATE stock SET reserved=reserved+?
+    DB-->>Inventory: Updated
+    Inventory-->>OrderSvc: Reserved
+
+    OrderSvc->>Queue: Publish(OrderCreated)
+    Queue-->>OrderSvc: Acknowledged
+    OrderSvc->>Cache: INVALIDATE order:list:userId
+    Cache-->>OrderSvc: OK
+    OrderSvc-->>Gateway: Order confirmation
+    Gateway-->>Browser: 201 + order
+
+    Queue->>Notify: Consume(OrderCreated)
+    Notify->>Notify: Render email template
+    Notify-->>Browser: Email: Order confirmed
 ```
 
 ## Class Diagram
@@ -81,6 +205,136 @@ classDiagram
     Shelter "1" --> "*" Animal : houses
 ```
 
+## Large Class Diagram
+
+```mermaid
+classDiagram
+    class Application {
+        -Config config
+        -Router router
+        -Logger logger
+        +start() void
+        +stop() void
+        +healthCheck() Status
+    }
+    class Router {
+        -List~Route~ routes
+        -List~Middleware~ middleware
+        +addRoute(Route) void
+        +addMiddleware(Middleware) void
+        +dispatch(Request) Response
+    }
+    class Middleware {
+        <<interface>>
+        +handle(Request, Next) Response
+    }
+    class AuthMiddleware {
+        -TokenValidator validator
+        +handle(Request, Next) Response
+    }
+    class RateLimiter {
+        -int maxRequests
+        -Duration window
+        -Map~String,int~ counters
+        +handle(Request, Next) Response
+    }
+    class Controller {
+        <<abstract>>
+        #Logger logger
+        +handleRequest(Request) Response
+    }
+    class UserController {
+        -UserService userService
+        +getUser(id) Response
+        +createUser(data) Response
+        +updateUser(id, data) Response
+        +deleteUser(id) Response
+        +listUsers(filters) Response
+    }
+    class OrderController {
+        -OrderService orderService
+        -PaymentService paymentService
+        +createOrder(data) Response
+        +cancelOrder(id) Response
+        +getOrderStatus(id) Response
+    }
+    class Service {
+        <<interface>>
+        +execute(Request) Result
+    }
+    class UserService {
+        -UserRepository repo
+        -EventBus events
+        +findById(id) User
+        +create(data) User
+        +update(id, data) User
+        +delete(id) void
+    }
+    class OrderService {
+        -OrderRepository repo
+        -InventoryService inventory
+        -EventBus events
+        +place(order) Order
+        +cancel(id) void
+        +status(id) OrderStatus
+    }
+    class Repository {
+        <<interface>>
+        +findById(id) Entity
+        +save(entity) Entity
+        +delete(id) void
+        +findAll(query) List~Entity~
+    }
+    class UserRepository {
+        -Database db
+        +findById(id) User
+        +findByEmail(email) User
+        +save(user) User
+        +delete(id) void
+        +findAll(query) List~User~
+    }
+    class OrderRepository {
+        -Database db
+        +findById(id) Order
+        +findByUser(userId) List~Order~
+        +save(order) Order
+        +delete(id) void
+        +findAll(query) List~Order~
+    }
+    class Database {
+        -ConnectionPool pool
+        +query(sql, params) ResultSet
+        +transaction(fn) Result
+        +close() void
+    }
+    class EventBus {
+        -Map~String,List~Handler~~ subscribers
+        +publish(event) void
+        +subscribe(topic, handler) void
+        +unsubscribe(topic, handler) void
+    }
+
+    Application --> Router
+    Application --> Logger
+    Router --> Middleware
+    Middleware <|.. AuthMiddleware
+    Middleware <|.. RateLimiter
+    Controller <|-- UserController
+    Controller <|-- OrderController
+    UserController --> UserService
+    OrderController --> OrderService
+    Service <|.. UserService
+    Service <|.. OrderService
+    UserService --> UserRepository
+    UserService --> EventBus
+    OrderService --> OrderRepository
+    OrderService --> EventBus
+    Repository <|.. UserRepository
+    Repository <|.. OrderRepository
+    UserRepository --> Database
+    OrderRepository --> Database
+```
+
 ## State Diagram
 
 ```mermaid
@@ -99,6 +353,90 @@ stateDiagram-v2
         Transforming --> Saving
         Saving --> [*]
     }
+```
+
+## Large State Diagram
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+
+    Idle --> Connecting : Connect
+    Connecting --> Authenticating : TCP established
+    Connecting --> RetryWait : Connection failed
+    RetryWait --> Connecting : Timer expired
+    RetryWait --> Idle : Max retries
+
+    Authenticating --> Handshake : Credentials valid
+    Authenticating --> Idle : Auth rejected
+
+    Handshake --> Ready : Handshake complete
+    Handshake --> Idle : Handshake timeout
+
+    Ready --> Subscribing : Subscribe
+    Ready --> Publishing : Publish
+    Ready --> Idle : Disconnect
+
+    state Subscribing {
+        [*] --> SendSub
+        SendSub --> WaitSubAck
+        WaitSubAck --> SubConfirmed : ACK received
+        WaitSubAck --> SubFailed : Timeout
+        SubFailed --> SendSub : Retry
+        SubConfirmed --> [*]
+    }
+
+    Subscribing --> Ready : Complete
+
+    state Publishing {
+        [*] --> QueueMessage
+        QueueMessage --> SendPublish
+        SendPublish --> WaitPubAck
+        WaitPubAck --> PubConfirmed : ACK received
+        WaitPubAck --> PubRetry : Timeout
+        PubRetry --> SendPublish : Retry
+        PubRetry --> PubFailed : Max retries
+        PubConfirmed --> [*]
+        PubFailed --> [*]
+    }
+
+    Publishing --> Ready : Complete
+
+    Ready --> Receiving : Message arrived
+
+    state Receiving {
+        [*] --> Validate
+        Validate --> Deserialize : Valid
+        Validate --> SendNack : Invalid
+        Deserialize --> Dispatch
+        Dispatch --> Process
+        Process --> SendAck : Success
+        Process --> SendNack : Error
+        SendAck --> [*]
+        SendNack --> [*]
+    }
+
+    Receiving --> Ready : Processed
+
+    Ready --> Reconnecting : Connection lost
+
+    state Reconnecting {
+        [*] --> BackoffWait
+        BackoffWait --> AttemptReconnect
+        AttemptReconnect --> ReauthAttempt : TCP restored
+        AttemptReconnect --> BackoffWait : Failed
+        ReauthAttempt --> RestoreSubs : Auth OK
+        ReauthAttempt --> BackoffWait : Auth failed
+        RestoreSubs --> [*]
+    }
+
+    Reconnecting --> Ready : Restored
+    Reconnecting --> Idle : Give up
+
+    Ready --> Draining : Graceful shutdown
+    Draining --> Closing : Queue empty
+    Draining --> Closing : Drain timeout
+    Closing --> [*]
 ```
 
 ## Entity Relationship Diagram
@@ -126,6 +464,138 @@ erDiagram
         int id PK
         string name
         float unitPrice
+    }
+```
+
+## Large ER Diagram
+
+```mermaid
+erDiagram
+    TENANT ||--o{ USER : has
+    TENANT {
+        uuid id PK
+        string name
+        string plan
+        date created_at
+        bool active
+    }
+    USER ||--o{ USER_ROLE : has
+    USER {
+        uuid id PK
+        uuid tenant_id FK
+        string email
+        string password_hash
+        string first_name
+        string last_name
+        date last_login
+        bool active
+    }
+    ROLE ||--o{ USER_ROLE : assigned
+    ROLE ||--o{ ROLE_PERMISSION : grants
+    ROLE {
+        uuid id PK
+        string name
+        string description
+    }
+    USER_ROLE {
+        uuid user_id FK
+        uuid role_id FK
+        date assigned_at
+    }
+    PERMISSION ||--o{ ROLE_PERMISSION : granted
+    PERMISSION {
+        uuid id PK
+        string resource
+        string action
+        string description
+    }
+    ROLE_PERMISSION {
+        uuid role_id FK
+        uuid permission_id FK
+    }
+    USER ||--o{ PROJECT : owns
+    USER ||--o{ TEAM_MEMBER : belongs
+    PROJECT ||--o{ TASK : contains
+    PROJECT ||--o{ SPRINT : has
+    PROJECT {
+        uuid id PK
+        uuid owner_id FK
+        uuid tenant_id FK
+        string name
+        string description
+        string status
+        date start_date
+        date target_date
+    }
+    TEAM ||--o{ TEAM_MEMBER : includes
+    TEAM ||--o{ PROJECT : assigned
+    TEAM {
+        uuid id PK
+        uuid tenant_id FK
+        string name
+        string description
+    }
+    TEAM_MEMBER {
+        uuid team_id FK
+        uuid user_id FK
+        string role
+        date joined_at
+    }
+    SPRINT ||--o{ TASK : schedules
+    SPRINT {
+        uuid id PK
+        uuid project_id FK
+        string name
+        int number
+        date start_date
+        date end_date
+        string status
+    }
+    TASK ||--o{ COMMENT : has
+    TASK ||--o{ TASK_ATTACHMENT : has
+    TASK ||--o{ TASK_HISTORY : tracks
+    TASK {
+        uuid id PK
+        uuid project_id FK
+        uuid sprint_id FK
+        uuid assignee_id FK
+        uuid reporter_id FK
+        string title
+        string description
+        string status
+        string priority
+        int story_points
+        date created_at
+        date updated_at
+        date due_date
+    }
+    USER ||--o{ COMMENT : writes
+    COMMENT {
+        uuid id PK
+        uuid task_id FK
+        uuid author_id FK
+        string body
+        date created_at
+        date updated_at
+    }
+    TASK_ATTACHMENT {
+        uuid id PK
+        uuid task_id FK
+        uuid uploader_id FK
+        string filename
+        string content_type
+        int size_bytes
+        string storage_key
+        date uploaded_at
+    }
+    TASK_HISTORY {
+        uuid id PK
+        uuid task_id FK
+        uuid changed_by FK
+        string field
+        string old_value
+        string new_value
+        date changed_at
     }
 ```
 

@@ -70,7 +70,7 @@ func main() {
 	imgResolver.SetDarkMode(navidown.IsDarkBackground())
 	imgManager := tviewAdapter.NewImageManager(imgResolver, 8, 16)
 	// Allow images to take up to their natural size (0 = no limit)
-	imgManager.SetMaxRows(40)
+	imgManager.SetMaxRows(0)
 	imgManager.SetSupported(true)
 	mdViewer.SetImageManager(imgManager)
 

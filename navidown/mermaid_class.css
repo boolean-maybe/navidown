@@ -1,12 +1,24 @@
-/* class diagram — larger font for terminal readability */
+/* class diagram — compact font matching other diagram types.
+   #my-svg specificity required to beat mermaid's inline theme styles. */
+#my-svg g.classGroup text {
+    font-size: 6px !important;
+}
+#my-svg .classLabel .label {
+    font-size: 6px !important;
+}
+#my-svg .classTitleText {
+    font-size: 7px !important;
+}
+#my-svg .edgeTerminals {
+    font-size: 6px !important;
+}
+#my-svg .nodeLabel, #my-svg .label div, #my-svg .label span {
+    font-size: 6px !important;
+    color: #d1d5db !important;
+}
 text {
-    font-size: 10px !important;
-}
-.nodeLabel, .label div, .label span {
-    font-size: 10px !important;
-}
-.edgeTerminals {
-    font-size: 10px !important;
+    font-size: 6px !important;
+    fill: #d1d5db !important;
 }
 .relation {
     stroke-width: 0.5 !important;
