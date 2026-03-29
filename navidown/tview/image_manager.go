@@ -28,7 +28,6 @@ type ImageManager struct {
 	idToInfo    map[uint32]*nav.ImageInfo
 	idToDisplay map[uint32]imageDisplay
 	supported   *bool // nil = unknown, pointer to bool = detected
-	purgedStale bool  // true after initial purge of stale Kitty images
 	resolver    *nav.ImageResolver
 	cellWidth   int
 	cellHeight  int
@@ -219,50 +218,51 @@ func (m *ImageManager) ResolveAndAllocate(url, sourceFilePath string, maxCols in
 	}, nil
 }
 
-// EnsureTransmitted sends image data to the terminal if not already sent.
-// Must be called during Draw() when we have access to the screen.
-func (m *ImageManager) EnsureTransmitted(screen tcell.Screen, id uint32) error {
+// EnsureTransmitted transmits an image to the terminal if it hasn't been sent yet.
+// Images are downscaled to match the display grid pixel dimensions before
+// transmission to stay within Kitty's 320MB RGBA storage quota.
+func (m *ImageManager) EnsureTransmitted(screen tcell.Screen, id uint32) {
 	m.mu.Lock()
-	// On first transmission, purge any stale images left in Kitty's cache
-	// from previous runs. Without this, Kitty may serve a cached image under
-	// the same ID instead of accepting the newly transmitted data.
-	if !m.purgedStale {
-		m.purgedStale = true
-		m.mu.Unlock()
-		m.DeleteAll(screen)
-		m.mu.Lock()
-	}
-
 	if m.transmitted[id] {
 		m.mu.Unlock()
-		return nil
+		return
 	}
-
 	info, ok := m.idToInfo[id]
 	display := m.idToDisplay[id]
-	if !ok {
-		m.mu.Unlock()
-		return fmt.Errorf("unknown image ID %d", id)
-	}
 	m.mu.Unlock()
 
-	cols, rows := display.cols, display.rows
+	if !ok {
+		return
+	}
 
 	tty := extractTty(screen)
 	if tty == nil {
-		return fmt.Errorf("no tty available for image transmission")
+		return
 	}
 
-	// Transmit with a=T,U=1 (combined transmit+display with unicode placement).
-	// Kitty handles scaling via c=/r= — no pre-resize needed.
-	if err := transmitImage(tty, id, info.Data, cols, rows); err != nil {
-		return err
+	cols, rows := display.cols, display.rows
+
+	// Downscale to the display grid pixel dimensions.
+	// Kitty decodes transmitted images to uncompressed RGBA in GPU memory
+	// (width * height * 4 bytes). The default storage quota is 320MB.
+	// Without downscaling, a 6124x5470 image uses ~128MB even if displayed
+	// in an 80x40 cell grid that only needs ~640x640 pixels.
+	targetW := cols * m.cellWidth
+	targetH := rows * m.cellHeight
+	data := info.Data
+	if targetW > 0 && targetH > 0 && (info.Width > targetW || info.Height > targetH) {
+		if resized, err := info.ResizedPNG(targetW, targetH); err == nil {
+			data = resized
+		}
+	}
+
+	if err := transmitImage(tty, id, data, cols, rows); err != nil {
+		return
 	}
 
 	m.mu.Lock()
 	m.transmitted[id] = true
 	m.mu.Unlock()
-	return nil
 }
 
 // DeleteImage removes an image from the terminal and internal tracking.

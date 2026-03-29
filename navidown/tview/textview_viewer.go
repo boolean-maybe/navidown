@@ -160,8 +160,7 @@ func (v *TextViewViewer) Draw(screen tcell.Screen) {
 	v.TextView.Draw(screen)
 }
 
-// transmitVisibleImages ensures all images referenced in the document are
-// transmitted to the terminal before rendering.
+// transmitVisibleImages ensures all known images have been sent to the terminal.
 func (v *TextViewViewer) transmitVisibleImages(screen tcell.Screen) {
 	if v.imageManager == nil {
 		return
@@ -174,7 +173,7 @@ func (v *TextViewViewer) transmitVisibleImages(screen tcell.Screen) {
 	v.imageManager.mu.Unlock()
 
 	for _, id := range ids {
-		_ = v.imageManager.EnsureTransmitted(screen, id)
+		v.imageManager.EnsureTransmitted(screen, id)
 	}
 }
 

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,6 +33,10 @@ func isImageFile(path string) bool {
 }
 
 func main() {
+	if os.Getenv("NAVIDOWN_DEBUG") != "" {
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	}
+
 	// parse flags
 	syntaxTheme := flag.String("syntax-theme", "", "chroma style name for code block syntax highlighting (e.g. dracula, monokai, catppuccin-macchiato)")
 	syntaxBg := flag.String("syntax-background", "", "background color for code blocks (e.g. #282a36, 236)")

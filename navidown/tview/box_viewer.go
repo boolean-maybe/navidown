@@ -180,10 +180,10 @@ func (v *BoxViewer) Draw(screen tcell.Screen) {
 		}
 		v.drawLine(screen, x, y+row, width, line, hs, he, v.backgroundColor)
 	}
+
 }
 
-// transmitVisibleImages ensures all images referenced in visible lines are
-// transmitted to the terminal before rendering.
+// transmitVisibleImages ensures all known images have been sent to the terminal.
 func (v *BoxViewer) transmitVisibleImages(screen tcell.Screen) {
 	if v.imageManager == nil {
 		return
@@ -196,7 +196,7 @@ func (v *BoxViewer) transmitVisibleImages(screen tcell.Screen) {
 	v.imageManager.mu.Unlock()
 
 	for _, id := range ids {
-		_ = v.imageManager.EnsureTransmitted(screen, id)
+		v.imageManager.EnsureTransmitted(screen, id)
 	}
 }
 
