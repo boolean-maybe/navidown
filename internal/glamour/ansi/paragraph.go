@@ -41,7 +41,7 @@ func (e *ParagraphElement) Finish(w io.Writer, ctx RenderContext) error {
 	mw := NewMarginWriter(ctx, w, rules)
 	if len(strings.TrimSpace(bs.Current().Block.String())) > 0 {
 		flow := wordwrap.NewWriter(int(bs.Width(ctx))) //nolint: gosec
-		flow.KeepNewlines = ctx.options.PreserveNewLines
+		flow.KeepNewlines = true
 		_, _ = flow.Write(bs.Current().Block.Bytes())
 		if err := flow.Close(); err != nil {
 			return fmt.Errorf("glamour: error closing flow: %w", err)

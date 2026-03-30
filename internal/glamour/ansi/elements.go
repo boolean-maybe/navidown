@@ -185,8 +185,14 @@ func (tr *ANSIRenderer) NewElement(node ast.Node, source []byte) Element {
 		}
 		s := string(n.Segment.Value(source))
 
-		if n.HardLineBreak() || (n.SoftLineBreak()) {
+		if n.HardLineBreak() {
 			s += "\n"
+		} else if n.SoftLineBreak() {
+			if ctx.options.PreserveNewLines {
+				s += "\n"
+			} else {
+				s += " "
+			}
 		}
 		return Element{
 			Renderer: &BaseElement{

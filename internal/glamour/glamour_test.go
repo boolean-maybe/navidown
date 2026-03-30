@@ -110,6 +110,66 @@ func TestWithPreservedNewLines(t *testing.T) {
 	golden.RequireEqual(t, []byte(b))
 }
 
+// stripANSI removes ANSI escape sequences from a string.
+var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(s string) string {
+	return ansiRe.ReplaceAllString(s, "")
+}
+
+func TestHardLineBreak(t *testing.T) {
+	r, err := NewTermRenderer(
+		WithStandardStyle("dark"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// two trailing spaces = CommonMark hard line break
+	in := "line one  \nline two  \nline three"
+	b, err := r.Render(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	plain := stripANSI(b)
+	// each line gets right-padded with spaces, so split on newline and trim
+	lines := strings.Split(plain, "\n")
+	var trimmed []string
+	for _, l := range lines {
+		if s := strings.TrimSpace(l); s != "" {
+			trimmed = append(trimmed, s)
+		}
+	}
+	if len(trimmed) != 3 {
+		t.Errorf("expected 3 lines from hard breaks, got %d.\nLines: %q", len(trimmed), trimmed)
+	}
+}
+
+func TestSoftLineBreak(t *testing.T) {
+	r, err := NewTermRenderer(
+		WithStandardStyle("dark"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// single newline = soft line break, should collapse to space
+	in := "line one\nline two\nline three"
+	b, err := r.Render(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	plain := strings.TrimSpace(stripANSI(b))
+	if strings.Contains(plain, "\n") {
+		t.Errorf("soft line breaks should collapse to spaces, but got newlines.\nGot: %q", plain)
+	}
+	if !strings.Contains(plain, "line one line two line three") {
+		t.Errorf("expected soft breaks to join with spaces.\nGot: %q", plain)
+	}
+}
+
 func TestStyles(t *testing.T) {
 	_, err := NewTermRenderer(
 		WithAutoStyle(),
