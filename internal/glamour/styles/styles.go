@@ -144,9 +144,11 @@ var (
 			Margin: uintPtr(defaultMargin),
 		},
 		BlockQuote: ansi.StyleBlock{
-			StylePrimitive: ansi.StylePrimitive{},
-			Indent:         uintPtr(1),
-			IndentToken:    stringPtr("│ "),
+			StylePrimitive: ansi.StylePrimitive{
+				Color: stringPtr("245"),
+			},
+			Indent:      uintPtr(1),
+			IndentToken: stringPtr("│ "),
 		},
 		List: ansi.StyleList{
 			LevelIndent: defaultListIndent,
@@ -354,9 +356,11 @@ var (
 			Margin: uintPtr(defaultMargin),
 		},
 		BlockQuote: ansi.StyleBlock{
-			StylePrimitive: ansi.StylePrimitive{},
-			Indent:         uintPtr(1),
-			IndentToken:    stringPtr("│ "),
+			StylePrimitive: ansi.StylePrimitive{
+				Color: stringPtr("243"),
+			},
+			Indent:      uintPtr(1),
+			IndentToken: stringPtr("│ "),
 		},
 		List: ansi.StyleList{
 			LevelIndent: defaultListIndent,

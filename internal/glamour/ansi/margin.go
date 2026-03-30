@@ -38,7 +38,7 @@ func NewMarginWriter(ctx RenderContext, w io.Writer, rules StyleBlock) *MarginWr
 		ic = *rules.IndentToken
 	}
 	iw := indent.NewWriterPipe(pw, indentation+margin, func(_ io.Writer) {
-		renderText(w, ctx.options.ColorProfile, bs.Parent().Style.StylePrimitive, ic)
+		renderText(w, ctx.options.ColorProfile, rules.StylePrimitive, ic)
 	})
 
 	return &MarginWriter{
