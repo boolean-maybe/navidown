@@ -149,7 +149,7 @@ func (o *MermaidOptions) ganttConfigData() []byte {
 
 // largeConfigData returns config JSON with fontSize for ER diagrams.
 func (o *MermaidOptions) largeConfigData() []byte {
-	return configDataWithFontSize(o.resolvedTheme(), "18px")
+	return configDataWithFontSize(o.resolvedTheme(), "8px")
 }
 
 // pieConfigData returns config JSON with colorful pie slice colors.
@@ -386,7 +386,7 @@ const (
 	tierSequence                        // sequence diagram — skip two-pass (wide natural width makes text tiny)
 	tierClass                           // class diagram — medium 10px
 	tierState                           // state diagram — 8px config and CSS matched
-	tierLarge                           // ER diagram — large 18px
+	tierLarge                           // ER diagram — 8px with ER-specific CSS
 	tierGantt                           // gantt — compact bars with smaller task/section fonts
 	tierPie                             // pie — colorful slices with white borders
 	tierGit                             // gitGraph — SVG post-processed for thin lines/circles
@@ -475,7 +475,7 @@ func (r *MermaidRenderer) configForSource(source string) (configPath, cssPath st
 // (theme, background, scale) so that option changes don't produce stale hits.
 // cacheVersion must be bumped when post-processing logic changes, since
 // post-processing runs after the cache key is computed from inputs.
-const cacheVersion = "v17"
+const cacheVersion = "v18"
 
 func (r *MermaidRenderer) cacheKey(source string) string {
 	h := sha256.New()

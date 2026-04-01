@@ -1,10 +1,10 @@
-/* state/ER diagrams — larger font for terminal readability */
+/* ER diagrams — 8px matched to config */
 text {
-    font-size: 18px !important;
+    font-size: 8px !important;
 }
 .nodeLabel, .label div, .label span {
-    font-size: 18px !important;
+    font-size: 8px !important;
 }
 .edgeTerminals {
-    font-size: 18px !important;
+    font-size: 8px !important;
 }
