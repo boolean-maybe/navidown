@@ -1,11 +1,11 @@
-/* state diagrams — 36px config sizes boxes; CSS 20px for visible text */
+/* state diagrams — 8px config and CSS matched */
 
 #my-svg g.stateGroup text {
-    font-size: 20px !important;
+    font-size: 8px !important;
 }
 
 #my-svg text {
-    font-size: 20px !important;
+    font-size: 8px !important;
 }
 
 /* center text in state node boxes (overrides inline display: table-cell) */
@@ -15,30 +15,30 @@
     align-items: center !important;
     width: 100% !important;
     height: 100% !important;
-    font-size: 20px !important;
+    font-size: 8px !important;
 }
 
 #my-svg .nodeLabel, #my-svg .nodeLabel p {
-    font-size: 20px !important;
+    font-size: 8px !important;
     text-align: center !important;
     margin: 0 !important;
 }
 
-/* edge labels — override theme red color and stateGroup 10px */
+/* edge labels — override theme red color */
 #my-svg .statediagram .edgeLabel {
     color: #f9fafb !important;
-    font-size: 20px !important;
+    font-size: 8px !important;
 }
 
 #my-svg .edgeLabel span,
 #my-svg .edgeLabel p,
 #my-svg .edgeLabel .nodeLabel {
     color: #f9fafb !important;
-    font-size: 20px !important;
+    font-size: 8px !important;
 }
 
 #my-svg .edgeLabel foreignObject > div {
-    font-size: 20px !important;
+    font-size: 8px !important;
     color: #f9fafb !important;
 }
 
@@ -48,29 +48,15 @@
 
 /* cluster label */
 #my-svg .cluster-label .nodeLabel {
-    font-size: 20px !important;
+    font-size: 8px !important;
 }
 
-/* thicker transition lines */
+/* thin transition lines */
 #my-svg .transition {
-    stroke-width: 2px !important;
+    stroke-width: 0.5px !important;
 }
 
-/* thicker box borders */
+/* thin box borders */
 #my-svg g.stateGroup rect {
-    stroke-width: 1.5px !important;
-}
-
-/* larger start state circles */
-#my-svg circle.state-start {
-    transform: scale(1.5) !important;
-}
-
-/* larger end state symbols (path-drawn double circle) */
-#my-svg .node.default path {
-    transform: scale(1.5) !important;
-}
-
-#my-svg .node.default circle {
-    transform: scale(1.5) !important;
+    stroke-width: 0.5px !important;
 }

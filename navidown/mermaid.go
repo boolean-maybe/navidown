@@ -98,10 +98,35 @@ func (o *MermaidOptions) classConfigData() []byte {
 	return configDataWithFontSize(o.resolvedTheme(), "6px")
 }
 
-// stateConfigData returns config JSON with fontSize for state diagrams.
-// Uses 36px so mermaid sizes boxes generously; CSS overrides visible text to 20px.
+// stateConfigData returns config JSON with fontSize and tight spacing for state diagrams.
 func (o *MermaidOptions) stateConfigData() []byte {
-	return configDataWithFontSize(o.resolvedTheme(), "36px")
+	var cfg map[string]any
+	_ = json.Unmarshal(defaultMermaidConfig, &cfg)
+	cfg["theme"] = o.resolvedTheme()
+	if tv, ok := cfg["themeVariables"].(map[string]any); ok {
+		tv["fontSize"] = "8px"
+	}
+	cfg["flowchart"] = map[string]any{
+		"curve":       "basis",
+		"padding":     4,
+		"nodeSpacing": 20,
+		"rankSpacing": 20,
+		"htmlLabels":  true,
+	}
+	cfg["state"] = map[string]any{
+		"padding":        4,
+		"dividerMargin":  4,
+		"sizeUnit":       3,
+		"titleTopMargin": 3,
+		"noteMargin":     5,
+		"forkWidth":      30,
+		"forkHeight":     8,
+		"miniPadding":    2,
+		"textHeight":     8,
+		"labelHeight":    10,
+	}
+	data, _ := json.MarshalIndent(cfg, "", "  ")
+	return data
 }
 
 // ganttConfigData returns config JSON with gantt-specific settings.
@@ -360,7 +385,7 @@ const (
 	tierDefault  diagramFontTier = iota // flowchart + other — compact 8px
 	tierSequence                        // sequence diagram — skip two-pass (wide natural width makes text tiny)
 	tierClass                           // class diagram — medium 10px
-	tierState                           // state diagram — 36px config for box sizing, 20px visible text
+	tierState                           // state diagram — 8px config and CSS matched
 	tierLarge                           // ER diagram — large 18px
 	tierGantt                           // gantt — compact bars with smaller task/section fonts
 	tierPie                             // pie — colorful slices with white borders
@@ -450,7 +475,7 @@ func (r *MermaidRenderer) configForSource(source string) (configPath, cssPath st
 // (theme, background, scale) so that option changes don't produce stale hits.
 // cacheVersion must be bumped when post-processing logic changes, since
 // post-processing runs after the cache key is computed from inputs.
-const cacheVersion = "v14"
+const cacheVersion = "v17"
 
 func (r *MermaidRenderer) cacheKey(source string) string {
 	h := sha256.New()
