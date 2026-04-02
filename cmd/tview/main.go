@@ -173,10 +173,14 @@ func main() {
 		AddItem(mdViewer, 0, 1, true).
 		AddItem(statusBar, 1, 0, false)
 
-	// set up quit handler
+	// set up global key handlers
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Rune() == 'q' {
+		switch event.Rune() {
+		case 'q':
 			app.Stop()
+			return nil
+		case 'r':
+			refreshContent(app, mdViewer)
 			return nil
 		}
 		return event
@@ -246,9 +250,27 @@ func updateStatusBar(statusBar *tview.TextView, v *tviewAdapter.TextViewViewer) 
 	} else {
 		status += "[gray]▶[-]"
 	}
-	status += fmt.Sprintf(" | Scroll:[%s]j/k[-] Top/End:[%s]g/G[-] Quit:[%s]q[-]", keyColor, keyColor, keyColor)
+	status += fmt.Sprintf(" | Scroll:[%s]j/k[-] Top/End:[%s]g/G[-] Refresh:[%s]r[-] Quit:[%s]q[-]", keyColor, keyColor, keyColor, keyColor)
 
 	statusBar.SetText(status)
+}
+
+// refreshContent clears all caches, re-reads the current file from disk, and re-renders.
+func refreshContent(app *tview.Application, v *tviewAdapter.TextViewViewer) {
+	srcPath := v.Core().SourceFilePath()
+	content, sourcePath, err := loadContent(srcPath)
+	if err != nil {
+		content = "# Error\n\nFailed to reload `" + srcPath + "`:\n\n```\n" + err.Error() + "\n```"
+		sourcePath = srcPath
+	}
+
+	// use a one-shot before-draw to get the screen for Kitty image purge
+	app.SetBeforeDrawFunc(func(screen tcell.Screen) bool {
+		v.InvalidateForDocument(screen)
+		v.SetMarkdownWithSource(content, sourcePath, false)
+		app.SetBeforeDrawFunc(nil)
+		return false
+	})
 }
 
 // splitFragment separates a URL into path and fragment components.

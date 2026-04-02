@@ -778,6 +778,29 @@ func (r *MermaidRenderer) naturalWidth(_ context.Context, inputPath, cfgPath, cs
 	return min(natural, compactCap)
 }
 
+// ClearCache flushes the in-memory cache and removes disk-cached PNGs.
+// Config and CSS files in the work directory are preserved.
+func (r *MermaidRenderer) ClearCache() {
+	r.cache.Range(func(key, _ any) bool { r.cache.Delete(key); return true })
+	entries, _ := os.ReadDir(r.workDir)
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".png") {
+			_ = os.Remove(filepath.Join(r.workDir, e.Name()))
+		}
+	}
+}
+
+// WorkDir returns the cache working directory.
+func (r *MermaidRenderer) WorkDir() string { return r.workDir }
+
+// EvictKeys removes specific cache entries by key (hex hash, no extension).
+func (r *MermaidRenderer) EvictKeys(keys []string) {
+	for _, key := range keys {
+		r.cache.Delete(key)
+		_ = os.Remove(filepath.Join(r.workDir, key+".png"))
+	}
+}
+
 // Close releases resources. Only removes the temp dir (if used as fallback).
 // Persistent cache directories are preserved for future sessions.
 func (r *MermaidRenderer) Close() {

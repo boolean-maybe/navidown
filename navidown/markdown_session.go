@@ -2,6 +2,9 @@ package navidown
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -9,6 +12,9 @@ import (
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
 )
+
+// hexHashPNG matches exactly a 64-char lowercase hex SHA256 hash with .png extension.
+var hexHashPNG = regexp.MustCompile(`^[0-9a-f]{64}\.png$`)
 
 // generateSlug converts header text to a URL-safe anchor slug (GitHub-compatible).
 // Example: "Hello World" → "hello-world", "What's New?" → "whats-new"
@@ -141,6 +147,55 @@ func New(opts Options) *MarkdownSession {
 		mermaidRenderer:      mermaid,
 		graphvizRenderer:     graphviz,
 	}
+}
+
+// ClearCaches flushes all diagram renderer caches (mermaid and graphviz),
+// both in-memory and on disk. Call before re-rendering to force fresh output.
+func (v *MarkdownSession) ClearCaches() {
+	if v.mermaidRenderer != nil {
+		v.mermaidRenderer.ClearCache()
+	}
+	if v.graphvizRenderer != nil {
+		v.graphvizRenderer.ClearCache()
+	}
+}
+
+// ClearCachesForDocument evicts only the diagram cache entries used by
+// the currently loaded document. Other documents' cached diagrams are preserved.
+func (v *MarkdownSession) ClearCachesForDocument() {
+	if v.mermaidRenderer != nil {
+		keys := diagramKeysForRenderer(v.elements, v.mermaidRenderer.WorkDir())
+		v.mermaidRenderer.EvictKeys(keys)
+	}
+	if v.graphvizRenderer != nil {
+		keys := diagramKeysForRenderer(v.elements, v.graphvizRenderer.WorkDir())
+		v.graphvizRenderer.EvictKeys(keys)
+	}
+}
+
+// diagramKeysForRenderer extracts cache keys from image elements whose URL
+// points into the given workDir. Only accepts <64-char-hex>.png basenames.
+func diagramKeysForRenderer(elements []NavElement, workDir string) []string {
+	if workDir == "" {
+		return nil
+	}
+	prefix := filepath.Clean(workDir) + string(os.PathSeparator)
+	var keys []string
+	for _, elem := range elements {
+		if elem.Type != NavElementImage {
+			continue
+		}
+		cleaned := filepath.Clean(elem.URL)
+		if !strings.HasPrefix(cleaned, prefix) {
+			continue
+		}
+		base := filepath.Base(cleaned)
+		if !hexHashPNG.MatchString(base) {
+			continue
+		}
+		keys = append(keys, strings.TrimSuffix(base, ".png"))
+	}
+	return keys
 }
 
 // Close releases resources held by the session (e.g., mermaid/graphviz temp files).

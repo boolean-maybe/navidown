@@ -104,6 +104,18 @@ func (c *CachingSVGRasterizer) Rasterize(svgData []byte, targetWidth int) ([]byt
 	return pngData, nil
 }
 
+// ClearCache flushes the in-memory cache and removes disk-cached PNGs.
+// The work directory and config files are preserved.
+func (c *CachingSVGRasterizer) ClearCache() {
+	c.cache.Range(func(key, _ any) bool { c.cache.Delete(key); return true })
+	entries, _ := os.ReadDir(c.workDir)
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".png") {
+			_ = os.Remove(filepath.Join(c.workDir, e.Name()))
+		}
+	}
+}
+
 // Close removes the temp directory if one was used as fallback.
 // Persistent cache directories are preserved.
 func (c *CachingSVGRasterizer) Close() {

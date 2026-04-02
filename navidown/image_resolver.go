@@ -124,6 +124,22 @@ func (r *ImageResolver) PreResolve(urls []string, sourceFilePath string) {
 	wg.Wait()
 }
 
+// ClearCache flushes the URL→ImageInfo cache and delegates to the SVG
+// rasterizer cache if it's the caching variant.
+func (r *ImageResolver) ClearCache() {
+	r.cache.Range(func(key, _ any) bool { r.cache.Delete(key); return true })
+	if c, ok := r.svgRasterizer.(*CachingSVGRasterizer); ok {
+		c.ClearCache()
+	}
+}
+
+// ClearCacheForURLs evicts specific URLs from the in-memory cache.
+func (r *ImageResolver) ClearCacheForURLs(urls []string) {
+	for _, url := range urls {
+		r.cache.Delete(url)
+	}
+}
+
 // Close releases resources held by the resolver (e.g. caching rasterizer temp dirs).
 func (r *ImageResolver) Close() {
 	if c, ok := r.svgRasterizer.(*CachingSVGRasterizer); ok {

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
@@ -151,6 +152,28 @@ func (r *GraphvizRenderer) RenderToFile(source string) (string, error) {
 
 	r.cache.Store(key, outputPath)
 	return outputPath, nil
+}
+
+// ClearCache flushes the in-memory cache and removes disk-cached PNGs.
+func (r *GraphvizRenderer) ClearCache() {
+	r.cache.Range(func(key, _ any) bool { r.cache.Delete(key); return true })
+	entries, _ := os.ReadDir(r.workDir)
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".png") {
+			_ = os.Remove(filepath.Join(r.workDir, e.Name()))
+		}
+	}
+}
+
+// WorkDir returns the cache working directory.
+func (r *GraphvizRenderer) WorkDir() string { return r.workDir }
+
+// EvictKeys removes specific cache entries by key (hex hash, no extension).
+func (r *GraphvizRenderer) EvictKeys(keys []string) {
+	for _, key := range keys {
+		r.cache.Delete(key)
+		_ = os.Remove(filepath.Join(r.workDir, key+".png"))
+	}
 }
 
 // Close releases resources. Only removes the temp dir (if used as fallback).

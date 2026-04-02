@@ -69,6 +69,31 @@ func NewTextView() *TextViewViewer {
 // Core exposes the underlying UI-agnostic markdown session.
 func (v *TextViewViewer) Core() *nav.MarkdownSession { return v.core }
 
+// InvalidateAll flushes all caches (diagram renderers, image resolver, SVG
+// rasterizer) and purges Kitty terminal images. Call before re-loading content
+// with SetMarkdownWithSource to force a complete re-render from disk.
+func (v *TextViewViewer) InvalidateAll(screen tcell.Screen) {
+	v.core.ClearCaches()
+	if v.imageManager != nil {
+		v.imageManager.InvalidateAll(screen)
+	}
+}
+
+// InvalidateForDocument evicts only cache entries used by the currently
+// displayed document. Other documents' cached diagrams and images are preserved.
+func (v *TextViewViewer) InvalidateForDocument(screen tcell.Screen) {
+	v.core.ClearCachesForDocument()
+	if v.imageManager != nil {
+		var urls []string
+		for _, elem := range v.core.Elements() {
+			if elem.Type == nav.NavElementImage {
+				urls = append(urls, elem.URL)
+			}
+		}
+		v.imageManager.InvalidateForDocument(screen, urls)
+	}
+}
+
 // SetImageManager enables Kitty image protocol support.
 // When set, images in markdown will be rendered as Unicode placeholders.
 func (v *TextViewViewer) SetImageManager(m *ImageManager) *TextViewViewer {

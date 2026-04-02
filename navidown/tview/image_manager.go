@@ -295,6 +295,47 @@ func (m *ImageManager) DeleteImage(screen tcell.Screen, id uint32) {
 	_, _ = io.WriteString(tty, cmd)
 }
 
+// InvalidateAll resets all image tracking state, clears the resolver cache,
+// and purges all Kitty terminal images. Call before re-rendering to force
+// fresh image resolution and transmission.
+func (m *ImageManager) InvalidateAll(screen tcell.Screen) {
+	m.mu.Lock()
+	m.urlToID = make(map[string]uint32)
+	m.idToInfo = make(map[uint32]*nav.ImageInfo)
+	m.idToDisplay = make(map[uint32]imageDisplay)
+	m.mu.Unlock()
+
+	m.resolver.ClearCache()
+	m.DeleteAll(screen)
+}
+
+// InvalidateForDocument evicts image tracking for the given URLs and purges
+// their Kitty terminal images. Other images remain cached.
+func (m *ImageManager) InvalidateForDocument(screen tcell.Screen, urls []string) {
+	m.mu.Lock()
+	seen := make(map[uint32]bool)
+	for _, url := range urls {
+		if id, ok := m.urlToID[url]; ok && !seen[id] {
+			seen[id] = true
+			delete(m.urlToID, url)
+			delete(m.idToInfo, id)
+			delete(m.idToDisplay, id)
+			delete(m.transmitted, id)
+		}
+	}
+	m.mu.Unlock()
+
+	tty := extractTty(screen)
+	if tty != nil {
+		for id := range seen {
+			cmd := fmt.Sprintf("\x1b_Ga=d,d=I,i=%d\x1b\\", id)
+			_, _ = io.WriteString(tty, cmd)
+		}
+	}
+
+	m.resolver.ClearCacheForURLs(urls)
+}
+
 // DeleteAll removes all images from the terminal.
 func (m *ImageManager) DeleteAll(screen tcell.Screen) {
 	m.mu.Lock()
