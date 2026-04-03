@@ -2,6 +2,7 @@ package navidown
 
 import (
 	"errors"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,12 +18,16 @@ var (
 // ResolveMarkdownPath resolves a markdown link URL to an absolute file path.
 //
 // Resolution order:
-// 1. If HTTP/HTTPS URL -> return as-is
-// 2. Security check for directory traversal
-// 3. If absolute path and exists -> return it
-// 4. If sourceFilePath provided, try same directory
-// 5. Try any extra search roots (in order)
-// 6. Return ErrFileNotFound
+// 1. If linkURL is HTTP/HTTPS -> return as-is
+// 2. If sourceFilePath is HTTP/HTTPS -> resolve linkURL as URL reference
+// 3. Security check for local directory traversal
+// 4. If local absolute path and exists -> return it
+// 5. If local sourceFilePath provided, try same directory
+// 6. Try any extra local search roots (in order)
+// 7. Return ErrFileNotFound
+//
+// Note: in HTTP source mode, resolution is URL-only and does not fall back to
+// local path checks or search roots.
 func ResolveMarkdownPath(linkURL, sourceFilePath string, searchRoots []string) (string, error) {
 	if linkURL == "" {
 		return "", nil
@@ -30,6 +35,12 @@ func ResolveMarkdownPath(linkURL, sourceFilePath string, searchRoots []string) (
 
 	if isHTTPURL(linkURL) {
 		return linkURL, nil
+	}
+
+	// resolve relative links against HTTP source file path;
+	// commits to remote resolution — no local fallback
+	if sourceFilePath != "" && looksLikeHTTPURL(sourceFilePath) {
+		return resolveAgainstHTTPSource(sourceFilePath, linkURL)
 	}
 
 	if containsDirectoryTraversal(linkURL) {
@@ -123,4 +134,36 @@ func fileExists(path string) bool {
 		return false
 	}
 	return !info.IsDir()
+}
+
+// looksLikeHTTPURL is a case-insensitive prefix check for http(s) URLs.
+// Separate from isHTTPURL to avoid changing its callers.
+func looksLikeHTTPURL(s string) bool {
+	lower := strings.ToLower(s)
+	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://")
+}
+
+// resolveAgainstHTTPSource resolves a relative link against an HTTP source URL
+// using RFC 3986 reference resolution. Returns only http/https results with
+// non-empty host. Returns ErrFileNotFound for invalid inputs to preserve the
+// existing sentinel error contract.
+func resolveAgainstHTTPSource(sourceURL, linkURL string) (string, error) {
+	base, err := url.Parse(sourceURL)
+	if err != nil || base.Host == "" {
+		return "", ErrFileNotFound
+	}
+	ref, err := url.Parse(linkURL)
+	if err != nil {
+		return "", ErrFileNotFound
+	}
+	resolved := base.ResolveReference(ref)
+	if resolved.Host == "" || !isHTTPScheme(resolved.Scheme) {
+		return "", ErrFileNotFound
+	}
+	return resolved.String(), nil
+}
+
+// isHTTPScheme checks if a scheme is http or https (case-insensitive).
+func isHTTPScheme(scheme string) bool {
+	return strings.EqualFold(scheme, "http") || strings.EqualFold(scheme, "https")
 }
