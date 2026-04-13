@@ -23,6 +23,18 @@ const (
 	LightStyle      = "light"
 	NoTTYStyle      = "notty"
 	PinkStyle       = "pink"
+
+	// additional named themes
+	GruvboxDarkStyle     = "gruvbox-dark"
+	CatppuccinMochaStyle = "catppuccin-mocha"
+	SolarizedDarkStyle   = "solarized-dark"
+	NordStyle            = "nord"
+	MonokaiStyle         = "monokai"
+	OneDarkStyle         = "one-dark"
+	CatppuccinLatteStyle = "catppuccin-latte"
+	SolarizedLightStyle  = "solarized-light"
+	GruvboxLightStyle    = "gruvbox-light"
+	GithubLightStyle     = "github-light"
 )
 
 var (
@@ -677,6 +689,18 @@ var (
 		// Popular themes
 		DraculaStyle:    &DraculaStyleConfig,
 		TokyoNightStyle: &TokyoNightStyleConfig,
+
+		// additional named themes
+		GruvboxDarkStyle:     &GruvboxDarkStyleConfig,
+		CatppuccinMochaStyle: &CatppuccinMochaStyleConfig,
+		SolarizedDarkStyle:   &SolarizedDarkStyleConfig,
+		NordStyle:            &NordStyleConfig,
+		MonokaiStyle:         &MonokaiStyleConfig,
+		OneDarkStyle:         &OneDarkStyleConfig,
+		CatppuccinLatteStyle: &CatppuccinLatteStyleConfig,
+		SolarizedLightStyle:  &SolarizedLightStyleConfig,
+		GruvboxLightStyle:    &GruvboxLightStyleConfig,
+		GithubLightStyle:     &GithubLightStyleConfig,
 	}
 )
 

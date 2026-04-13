@@ -173,6 +173,49 @@ func TestNewANSIRendererWithStyle_RegisteredStyle(t *testing.T) {
 	}
 }
 
+func TestNewANSIRendererWithStyle_AllRegisteredStyles(t *testing.T) {
+	// every entry in DefaultStyles must produce a non-nil renderer
+	// with distinct Document.Color from the fallback dark style
+	dark := NewANSIRendererWithStyle("dark")
+
+	for name := range styles.DefaultStyles {
+		t.Run(name, func(t *testing.T) {
+			r := NewANSIRendererWithStyle(name)
+			if r == nil {
+				t.Fatalf("NewANSIRendererWithStyle(%q) returned nil", name)
+			}
+			// margins should always be cleared
+			if r.glamourStyle.Document.Margin != nil && *r.glamourStyle.Document.Margin != 0 {
+				t.Errorf("Document.Margin should be 0, got %d", *r.glamourStyle.Document.Margin)
+			}
+			// non-dark/ascii/notty styles should have a distinct Document.Color
+			if name != "dark" && name != "ascii" && name != "notty" {
+				if r.glamourStyle.Document.Color != nil && dark.glamourStyle.Document.Color != nil &&
+					*r.glamourStyle.Document.Color == *dark.glamourStyle.Document.Color {
+					t.Errorf("style %q has same Document.Color as dark (%s)", name, *dark.glamourStyle.Document.Color)
+				}
+			}
+		})
+	}
+}
+
+func TestAllRegisteredStyles_RenderSmoke(t *testing.T) {
+	const sample = "# Heading\n\nHello **world**. `code` and *italic*.\n\n- item\n- item\n\n```go\nfunc main() {}\n```\n"
+
+	for name := range styles.DefaultStyles {
+		t.Run(name, func(t *testing.T) {
+			r := NewANSIRendererWithStyle(name)
+			result, err := r.Render(sample)
+			if err != nil {
+				t.Fatalf("Render with style %q failed: %v", name, err)
+			}
+			if len(result.Lines) < 3 {
+				t.Errorf("expected at least 3 output lines, got %d", len(result.Lines))
+			}
+		})
+	}
+}
+
 func TestNewANSIRendererBackwardsCompatibility(t *testing.T) {
 	// NewANSIRenderer should behave exactly like NewANSIRendererWithStyle("dark")
 	r1 := NewANSIRenderer()
