@@ -542,7 +542,7 @@ var (
 					Color: stringPtr("#777777"),
 				},
 				Background: ansi.StylePrimitive{
-					BackgroundColor: stringPtr("#373737"),
+					BackgroundColor: stringPtr("#f5f5f5"),
 				},
 			},
 		},
