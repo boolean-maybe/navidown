@@ -83,6 +83,14 @@ func containsDirectoryTraversal(path string) bool {
 	// Security: absolute paths into sensitive system directories are disallowed.
 	// This prevents resolving system files like /etc/passwd via absolute link URLs.
 	if filepath.IsAbs(path) {
+		// navidown writes rasterized Mermaid/SVG output under os.UserCacheDir()/navidown/
+		// and later hands those absolute paths back to the resolver. When tiki runs as
+		// root (typical in Docker), the cache lives at /root/.cache/navidown/, which the
+		// /root block below would otherwise reject. Whitelist the known-safe subtree.
+		if isNavidownCachePath(path) {
+			return false
+		}
+
 		cleaned := filepath.Clean(path)
 		parts := strings.Split(cleaned, string(filepath.Separator))
 		// For absolute paths, parts[0] will be "" (leading slash), so the first
@@ -134,6 +142,21 @@ func fileExists(path string) bool {
 		return false
 	}
 	return !info.IsDir()
+}
+
+// isNavidownCachePath reports whether path is under the navidown cache directory.
+// This whitelist exists so that internally-rasterized Mermaid/SVG outputs can be
+// handed back to the resolver without tripping the sensitive-directory block —
+// their absolute paths (e.g. /root/.cache/navidown/mermaid/<hash>.png in a root
+// container) are known-safe because navidown itself wrote them.
+func isNavidownCachePath(path string) bool {
+	cacheDir, err := os.UserCacheDir()
+	if err != nil || cacheDir == "" {
+		return false
+	}
+	root := filepath.Join(cacheDir, "navidown") + string(filepath.Separator)
+	cleaned := filepath.Clean(path)
+	return strings.HasPrefix(cleaned+string(filepath.Separator), root)
 }
 
 // looksLikeHTTPURL is a case-insensitive prefix check for http(s) URLs.

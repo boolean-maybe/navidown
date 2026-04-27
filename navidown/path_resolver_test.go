@@ -481,3 +481,39 @@ func TestContainsDirectoryTraversal_AbsoluteSensitivePaths(t *testing.T) {
 		})
 	}
 }
+
+// Regression test: navidown writes rasterized PNGs under os.UserCacheDir()/navidown/
+// and hands those absolute paths back to the resolver. Containers that run as root
+// put the cache under /root/.cache/, which would otherwise collide with the /root
+// sensitive-directory block. The cache subtree must stay allowed.
+func TestContainsDirectoryTraversal_NavidownCacheAllowed(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix-only path semantics")
+	}
+	cacheDir, err := os.UserCacheDir()
+	if err != nil || cacheDir == "" {
+		t.Skip("no user cache dir available")
+	}
+	navCache := filepath.Join(cacheDir, "navidown")
+
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{name: "Mermaid cache PNG", path: filepath.Join(navCache, "mermaid", "abc123.png"), want: false},
+		{name: "SVG cache PNG", path: filepath.Join(navCache, "svg", "def456.png"), want: false},
+		{name: "Cache root", path: navCache, want: false},
+		// Ensure the whitelist doesn't extend to adjacent directories with a shared prefix.
+		{name: "Adjacent dir with same-prefix name", path: cacheDir + string(filepath.Separator) + "navidown-evil" + string(filepath.Separator) + "x.png", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := containsDirectoryTraversal(tt.path)
+			if got != tt.want {
+				t.Errorf("containsDirectoryTraversal(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}

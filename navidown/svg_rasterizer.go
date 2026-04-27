@@ -19,7 +19,24 @@ type SVGRasterizer interface {
 }
 
 // ResvgRasterizer rasterizes SVG via the `resvg` CLI tool.
-type ResvgRasterizer struct{}
+type ResvgRasterizer struct {
+	familyOnce sync.Once
+	sansSerif  string
+	serif      string
+	monospace  string
+}
+
+// resvg's built-in generic-to-real-family map targets Windows/macOS font
+// names (Arial, Times New Roman, Courier New). On Linux/Docker those aren't
+// installed, and SVG text silently renders as nothing. Probe resvg's loaded
+// font database at first use and pick real families that are actually present.
+// Preference order favors the Microsoft-metric fonts (so macOS keeps its
+// existing look) with DejaVu/Liberation as Linux fallbacks.
+var (
+	sansSerifPrefs = []string{"Arial", "Helvetica", "Liberation Sans", "DejaVu Sans"}
+	serifPrefs     = []string{"Times New Roman", "Times", "Liberation Serif", "DejaVu Serif"}
+	monospacePrefs = []string{"Courier New", "Courier", "Liberation Mono", "DejaVu Sans Mono"}
+)
 
 func (r *ResvgRasterizer) Rasterize(svgData []byte, targetWidth int) ([]byte, error) {
 	resvgPath, err := exec.LookPath("resvg")
@@ -27,7 +44,21 @@ func (r *ResvgRasterizer) Rasterize(svgData []byte, targetWidth int) ([]byte, er
 		return nil, fmt.Errorf("resvg not found in PATH: %w", err)
 	}
 
-	cmd := exec.Command(resvgPath, "-w", strconv.Itoa(targetWidth), "-", "-c") // #nosec G204 -- resvgPath from LookPath("resvg")
+	r.familyOnce.Do(func() { r.probeFamilies(resvgPath) })
+
+	args := []string{"-w", strconv.Itoa(targetWidth)}
+	if r.sansSerif != "" {
+		args = append(args, "--sans-serif-family", r.sansSerif)
+	}
+	if r.serif != "" {
+		args = append(args, "--serif-family", r.serif)
+	}
+	if r.monospace != "" {
+		args = append(args, "--monospace-family", r.monospace)
+	}
+	args = append(args, "-", "-c")
+
+	cmd := exec.Command(resvgPath, args...) // #nosec G204 -- resvgPath from LookPath("resvg")
 	cmd.Stdin = bytes.NewReader(svgData)
 
 	out, err := cmd.Output()
@@ -39,6 +70,61 @@ func (r *ResvgRasterizer) Rasterize(svgData []byte, targetWidth int) ([]byte, er
 	}
 
 	return out, nil
+}
+
+// probeFamilies runs `resvg --list-fonts` and picks real family names for
+// the three generic categories. Silent failure is fine — rasterization will
+// still run with resvg's built-in defaults, and macOS users will be unaffected.
+func (r *ResvgRasterizer) probeFamilies(resvgPath string) {
+	cmd := exec.Command(resvgPath, "--list-fonts") // #nosec G204 -- resvgPath from LookPath
+	out, err := cmd.Output()
+	if err != nil {
+		return
+	}
+	available := parseResvgFontList(out)
+	r.sansSerif = pickFamily(available, sansSerifPrefs)
+	r.serif = pickFamily(available, serifPrefs)
+	r.monospace = pickFamily(available, monospacePrefs)
+}
+
+// parseResvgFontList extracts family names from the output of
+// `resvg --list-fonts`. Each loaded-font line has the shape:
+//
+//	/path/to/font.ttf: 'Family Name (locale)', 0, Normal, 400, Normal
+//
+// We collect the bare family name (stripping the parenthesized locale).
+func parseResvgFontList(out []byte) map[string]struct{} {
+	families := make(map[string]struct{})
+	for _, line := range strings.Split(string(out), "\n") {
+		start := strings.IndexByte(line, '\'')
+		if start < 0 {
+			continue
+		}
+		end := strings.IndexByte(line[start+1:], '\'')
+		if end < 0 {
+			continue
+		}
+		name := line[start+1 : start+1+end]
+		if paren := strings.LastIndex(name, " ("); paren > 0 {
+			name = name[:paren]
+		}
+		name = strings.TrimSpace(name)
+		if name != "" {
+			families[name] = struct{}{}
+		}
+	}
+	return families
+}
+
+// pickFamily returns the first entry in prefs that is present in available,
+// or "" if none match.
+func pickFamily(available map[string]struct{}, prefs []string) string {
+	for _, p := range prefs {
+		if _, ok := available[p]; ok {
+			return p
+		}
+	}
+	return ""
 }
 
 // CachingSVGRasterizer wraps an SVGRasterizer with a persistent disk cache
