@@ -115,6 +115,31 @@ func TestMarkdownSession_SVGImageExtraction(t *testing.T) {
 	}
 }
 
+// TestMarkdownSession_LongImageURLSurvivesNarrowWidth is the end-to-end
+// regression for the screen leak where a standalone image with a long URL was
+// fractured by word-wrap at a narrow width, so the post-processor could not match
+// the token and the raw "IMG:<path>" text (plus the OS path) leaked to the screen.
+func TestMarkdownSession_LongImageURLSurvivesNarrowWidth(t *testing.T) {
+	session := New(Options{}) // no post-processor → fallback path
+
+	longURL := "/Users/example/Library/Caches/navidown/mermaid/" +
+		"8b2bbe8f92b10b5434f7285e7eee6abc1234567890abcdef1234567890abcdef.png"
+	if err := session.SetMarkdown("![mermaid diagram](" + longURL + ")\n"); err != nil {
+		t.Fatalf("SetMarkdown: %v", err)
+	}
+	session.SetWidth(40) // far narrower than the ~128-char URL
+
+	joined := strings.Join(session.RenderedLines(), "\n")
+
+	if strings.Contains(joined, "￰") || strings.Contains(joined, "￱") ||
+		strings.Contains(joined, "IMG:") {
+		t.Errorf("raw image token leaked to output at narrow width:\n%q", joined)
+	}
+	if !strings.Contains(joined, "[image: mermaid diagram]") {
+		t.Errorf("expected intact fallback '[image: mermaid diagram]', got:\n%q", joined)
+	}
+}
+
 type testImageProcessor struct{}
 
 func (p *testImageProcessor) ProcessImageTokens(lines []string, _ string, _ int) []string {

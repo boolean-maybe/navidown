@@ -31,10 +31,13 @@ func (e *ImageElement) Render(w io.Writer, ctx RenderContext) error {
 		resolvedURL = resolveRelativeURL(e.BaseURL, e.URL)
 	}
 
-	// If the URL looks like an image, emit a placeholder token
+	// If the URL looks like an image, emit a placeholder token. The token can be
+	// arbitrarily long (e.g. an absolute cache path), so it is masked behind a
+	// run of one-column placeholder runes for the duration of the width-sensitive
+	// writers and restored intact when the document is flushed — see image_wrap.go.
 	if !e.TextOnly && len(resolvedURL) > 0 && looksLikeImage(resolvedURL) {
 		token := imageTokenStart + "IMG:" + resolvedURL + imageFieldSep + e.Text + imageTokenEnd
-		_, err := io.WriteString(w, token)
+		_, err := io.WriteString(w, ctx.imageTokens.mask(token, int(ctx.blockStack.Width(ctx)))) //nolint: gosec
 		return err
 	}
 

@@ -11,8 +11,9 @@ import (
 type RenderContext struct {
 	options Options
 
-	blockStack *BlockStack
-	table      *TableElement
+	blockStack  *BlockStack
+	table       *TableElement
+	imageTokens *imageTokenTable
 
 	stripper *bluemonday.Policy
 }
@@ -20,10 +21,11 @@ type RenderContext struct {
 // NewRenderContext returns a new RenderContext.
 func NewRenderContext(options Options) RenderContext {
 	return RenderContext{
-		options:    options,
-		blockStack: &BlockStack{},
-		table:      &TableElement{},
-		stripper:   bluemonday.StrictPolicy(),
+		options:     options,
+		blockStack:  &BlockStack{},
+		table:       &TableElement{},
+		imageTokens: &imageTokenTable{},
+		stripper:    bluemonday.StrictPolicy(),
 	}
 }
 

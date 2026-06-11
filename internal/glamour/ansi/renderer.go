@@ -1,6 +1,7 @@
 package ansi
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/url"
@@ -119,16 +120,26 @@ func (r *ANSIRenderer) renderNode(w util.BufWriter, source []byte, node ast.Node
 			writeTo = io.Writer(bs.Parent().Block)
 		}
 
-		// if we're finished rendering the entire document,
-		// flush to the real writer
+		// if we're finished rendering the entire document, flush to the real
+		// writer — but route the final flush through a buffer so masked image
+		// tokens can be restored after every width-sensitive writer has run.
+		var docBuf *bytes.Buffer
 		if node.Type() == ast.TypeDocument {
-			writeTo = w
+			docBuf = &bytes.Buffer{}
+			writeTo = docBuf
 		}
 
 		if e.Finisher != nil {
 			err := e.Finisher.Finish(writeTo, r.context)
 			if err != nil {
 				return ast.WalkStop, fmt.Errorf("glamour: error finishing render: %w", err)
+			}
+		}
+
+		if docBuf != nil {
+			restored := r.context.imageTokens.restore(docBuf.String())
+			if _, err := io.WriteString(w, restored); err != nil {
+				return ast.WalkStop, fmt.Errorf("glamour: error flushing document: %w", err)
 			}
 		}
 
