@@ -17,6 +17,7 @@ import (
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/util"
+	"go.abhg.dev/goldmark/frontmatter"
 	"golang.org/x/term"
 
 	"github.com/boolean-maybe/navidown/internal/glamour/ansi"
@@ -73,6 +74,10 @@ func NewTermRenderer(options ...TermRendererOption) (*TermRenderer, error) {
 			goldmark.WithExtensions(
 				extension.GFM,
 				extension.DefinitionList,
+				// strips YAML/TOML frontmatter from the output and stores the
+				// parsed values on the document (accessible via doc.Meta()) so a
+				// future renderer can display them, e.g. as a table.
+				&frontmatter.Extender{Mode: frontmatter.SetMetadata},
 			),
 			goldmark.WithParserOptions(
 				parser.WithAutoHeadingID(),

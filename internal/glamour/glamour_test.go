@@ -117,6 +117,41 @@ func stripANSI(s string) string {
 	return ansiRe.ReplaceAllString(s, "")
 }
 
+func TestFrontmatterStripped(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+	}{
+		{
+			name: "yaml",
+			in:   "---\ntitle: Hello\ntags: [a, b]\n---\n\n# Heading\n\nbody text\n",
+		},
+		{
+			name: "toml",
+			in:   "+++\ntitle = \"Hello\"\ntags = [\"a\", \"b\"]\n+++\n\n# Heading\n\nbody text\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, err := NewTermRenderer(WithStandardStyle("dark"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			out, err := r.Render(tt.in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plain := stripANSI(out)
+			if strings.Contains(plain, "title") || strings.Contains(plain, "tags") {
+				t.Fatalf("frontmatter leaked into output: %q", plain)
+			}
+			if !strings.Contains(plain, "Heading") || !strings.Contains(plain, "body text") {
+				t.Fatalf("body content missing from output: %q", plain)
+			}
+		})
+	}
+}
+
 func TestHardLineBreak(t *testing.T) {
 	r, err := NewTermRenderer(
 		WithStandardStyle("dark"),
