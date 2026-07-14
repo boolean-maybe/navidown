@@ -47,7 +47,7 @@ func NewImageResolver(searchRoots []string) *ImageResolver {
 	}
 }
 
-// SetSVGRasterizer overrides the default ResvgRasterizer (useful for testing).
+// SetSVGRasterizer overrides the default wasm rasterizer (useful for testing).
 func (r *ImageResolver) SetSVGRasterizer(rast SVGRasterizer) {
 	r.svgRasterizer = rast
 }
@@ -180,17 +180,26 @@ func (r *ImageResolver) svgRasterizeWidth(data []byte) int {
 	return fallback
 }
 
-// defaultRasterizer creates and caches a CachingSVGRasterizer (or falls back to bare ResvgRasterizer).
+// defaultRasterizer creates and caches a CachingSVGRasterizer wrapping the shared
+// wasm rasterizer, falling back to the bare wasm rasterizer if no cache dir resolves.
 func (r *ImageResolver) defaultRasterizer() SVGRasterizer {
-	rast := NewCachingSVGRasterizer(&ResvgRasterizer{}, "")
-	if rast != nil {
-		r.svgRasterizer = rast
-		return rast
+	wasm, err := sharedWasmRasterizer()
+	if err != nil {
+		// no rasterizer available; return a nil-safe zero that errors on use
+		return errRasterizer{err}
 	}
-	bare := &ResvgRasterizer{}
-	r.svgRasterizer = bare
-	return bare
+	if cached := NewCachingSVGRasterizer(wasm, ""); cached != nil {
+		r.svgRasterizer = cached
+		return cached
+	}
+	r.svgRasterizer = wasm
+	return wasm
 }
+
+// errRasterizer surfaces a construction error at Rasterize time.
+type errRasterizer struct{ err error }
+
+func (e errRasterizer) Rasterize([]byte, int) ([]byte, error) { return nil, e.err }
 
 func (r *ImageResolver) fetchImageBytes(url string, sourceFilePath string) ([]byte, error) {
 	if isHTTPURL(url) {

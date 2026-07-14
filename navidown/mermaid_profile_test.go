@@ -72,7 +72,7 @@ func TestProfile_ParallelTimeline(t *testing.T) {
 	if renderer == nil {
 		t.Fatal("NewMermaidRenderer returned nil")
 	}
-	renderer.resvgPath = ""
+	renderer.rasterizer = nil
 	t.Cleanup(renderer.Close)
 
 	// manually call extractMermaidBlocks + parallel render with timestamps

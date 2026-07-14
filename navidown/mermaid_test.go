@@ -29,8 +29,8 @@ func newTestMermaidRenderer(t *testing.T) *MermaidRenderer {
 	if renderer == nil {
 		t.Fatal("NewMermaidRenderer returned nil")
 	}
-	// disable resvg path so the fake mmdc (which outputs PNG, not SVG) works
-	renderer.resvgPath = ""
+	// disable wasm rasterizer so the fake mmdc (which outputs PNG, not SVG) works
+	renderer.rasterizer = nil
 	t.Cleanup(renderer.Close)
 	return renderer
 }
@@ -225,7 +225,7 @@ func TestPreprocessMermaid_ErrorPreservesBlock(t *testing.T) {
 	if renderer == nil {
 		t.Fatal("NewMermaidRenderer returned nil")
 	}
-	renderer.resvgPath = ""
+	renderer.rasterizer = nil
 	t.Cleanup(renderer.Close)
 
 	md := "```mermaid\ngraph TD\n    A-->B\n```\n"
@@ -491,7 +491,7 @@ func TestMermaidRenderer_DiskCache(t *testing.T) {
 	if r1 == nil {
 		t.Fatal("r1 is nil")
 	}
-	r1.resvgPath = ""
+	r1.rasterizer = nil
 	path1, err := r1.RenderToFile(source)
 	if err != nil {
 		t.Fatalf("r1 render: %v", err)
@@ -503,7 +503,7 @@ func TestMermaidRenderer_DiskCache(t *testing.T) {
 	if r2 == nil {
 		t.Fatal("r2 is nil")
 	}
-	r2.resvgPath = ""
+	r2.rasterizer = nil
 	path2, err := r2.RenderToFile(source)
 	if err != nil {
 		t.Fatalf("r2 render: %v", err)

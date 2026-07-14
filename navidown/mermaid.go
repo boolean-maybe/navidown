@@ -1,7 +1,6 @@
 package navidown
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	_ "embed"
@@ -228,28 +227,28 @@ type MermaidRenderer struct {
 	tempDir         string   // temp fallback (deleted by Close); "" if persistent worked
 	workDir         string   // whichever dir is actually used
 	mmdcPath        string
-	configPath      string // path to config JSON written to workDir
-	configData      []byte // resolved config content (used in cache key)
-	classConfigPath string // path to class-diagram config JSON
-	classConfigData []byte // resolved class config content (used in cache key)
-	cssPath         string // path to default CSS override written to workDir
-	classCSSPath    string // path to class-diagram-specific CSS override
-	stateConfigPath string // path to state-diagram config JSON
-	stateConfigData []byte // resolved state config content
-	stateCSSPath    string // path to state-diagram CSS override
-	largeConfigPath string // path to large-font config JSON (ER)
-	largeConfigData []byte // resolved large config content
-	largeCSSPath    string // path to large-font CSS override (ER)
-	ganttConfigPath string // path to gantt config JSON
-	ganttConfigData []byte // resolved gantt config content
-	ganttCSSPath    string // path to gantt CSS override
-	pieConfigPath   string // path to pie config JSON
-	pieConfigData   []byte // resolved pie config content
-	pieCSSPath      string // path to pie CSS override
-	gitConfigPath   string // path to git config JSON
-	gitConfigData   []byte // resolved git config content
-	gitCSSPath      string // path to git CSS override
-	resvgPath       string // path to resvg binary; "" if not found
+	configPath      string        // path to config JSON written to workDir
+	configData      []byte        // resolved config content (used in cache key)
+	classConfigPath string        // path to class-diagram config JSON
+	classConfigData []byte        // resolved class config content (used in cache key)
+	cssPath         string        // path to default CSS override written to workDir
+	classCSSPath    string        // path to class-diagram-specific CSS override
+	stateConfigPath string        // path to state-diagram config JSON
+	stateConfigData []byte        // resolved state config content
+	stateCSSPath    string        // path to state-diagram CSS override
+	largeConfigPath string        // path to large-font config JSON (ER)
+	largeConfigData []byte        // resolved large config content
+	largeCSSPath    string        // path to large-font CSS override (ER)
+	ganttConfigPath string        // path to gantt config JSON
+	ganttConfigData []byte        // resolved gantt config content
+	ganttCSSPath    string        // path to gantt CSS override
+	pieConfigPath   string        // path to pie config JSON
+	pieConfigData   []byte        // resolved pie config content
+	pieCSSPath      string        // path to pie CSS override
+	gitConfigPath   string        // path to git config JSON
+	gitConfigData   []byte        // resolved git config content
+	gitCSSPath      string        // path to git CSS override
+	rasterizer      SVGRasterizer // wasm SVG->PNG; nil only if wasm failed to init
 }
 
 // NewMermaidRenderer creates a new renderer. Returns nil if mmdc is not found.
@@ -345,8 +344,6 @@ func NewMermaidRenderer(opts MermaidOptions) *MermaidRenderer {
 		return nil
 	}
 
-	resvgPath, _ := exec.LookPath("resvg")
-
 	return &MermaidRenderer{
 		opts:            opts,
 		persistentDir:   persistentDir,
@@ -374,7 +371,13 @@ func NewMermaidRenderer(opts MermaidOptions) *MermaidRenderer {
 		gitConfigPath:   gitConfigPath,
 		gitConfigData:   gitConfigData,
 		gitCSSPath:      gitCSSPath,
-		resvgPath:       resvgPath,
+		rasterizer: func() SVGRasterizer {
+			r, err := sharedWasmRasterizer()
+			if err != nil {
+				return nil
+			}
+			return r
+		}(),
 	}
 }
 
@@ -520,8 +523,8 @@ func (r *MermaidRenderer) cacheKey(source string) string {
 	h.Write([]byte{0})
 	_, _ = fmt.Fprintf(h, "%d", r.widthForSource(source))
 	h.Write([]byte{0})
-	if r.resvgPath != "" {
-		h.Write([]byte("resvg"))
+	if r.rasterizer != nil {
+		h.Write([]byte("wasm"))
 	} else {
 		h.Write([]byte("mmdc"))
 	}
@@ -562,10 +565,10 @@ func (r *MermaidRenderer) RenderToFile(source string) (string, error) {
 
 	cfgPath, css := r.configForSource(source)
 
-	// gitGraph requires SVG post-processing + resvg because mmdc's Puppeteer
+	// gitGraph requires SVG post-processing + wasm rasterizer because mmdc's Puppeteer
 	// ignores CSS overrides for SVG attributes (circle r, stroke-width).
-	// resvg works for gitGraph since it uses <text> elements, not foreignObject.
-	if fontTier(source) == tierGit && r.resvgPath != "" {
+	// wasm rasterizer works for gitGraph since it uses <text> elements, not foreignObject.
+	if fontTier(source) == tierGit && r.rasterizer != nil {
 		pngPath, err := r.renderViaResvg(ctx, inputPath, outputPath, cfgPath, css, source)
 		if err != nil {
 			return "", err
@@ -604,8 +607,8 @@ func (r *MermaidRenderer) RenderToFile(source string) (string, error) {
 
 // renderViaResvg renders mermaid source to SVG via mmdc, post-processes the SVG
 // to fix attributes that CSS cannot override (circle radii, stroke widths),
-// then rasterizes to PNG via resvg. Only used for gitGraph (which uses <text>
-// elements); most diagram types use foreignObject/HTML that resvg can't render.
+// then rasterizes to PNG via wasm. Only used for gitGraph (which uses <text>
+// elements); most diagram types use foreignObject/HTML that wasm can't render.
 func (r *MermaidRenderer) renderViaResvg(ctx context.Context, inputPath, outputPath, cfgPath, css, source string) (string, error) {
 	svgPath := strings.TrimSuffix(outputPath, ".png") + ".svg"
 
@@ -631,24 +634,20 @@ func (r *MermaidRenderer) renderViaResvg(ctx context.Context, inputPath, outputP
 
 	svgData = postProcessGitSVG(svgData)
 
-	// rasterize with resvg at 1.5x for a compact but readable result
+	// rasterize with wasm at 1.5x for a compact but readable result
 	vbW, ok := extractSVGViewBoxWidth(svgData)
 	targetWidth := r.widthForSource(source) * 3 / 2
 	if ok && vbW > 0 {
 		targetWidth = int(vbW) * 3 / 2
 	}
 
-	resvgCmd := exec.CommandContext(ctx, r.resvgPath, // #nosec G204
-		"-w", strconv.Itoa(targetWidth),
-		"-", outputPath,
-	)
-	resvgCmd.Stdin = bytes.NewReader(svgData)
-
-	resvgOut, err := resvgCmd.CombinedOutput()
+	pngData, err := r.rasterizer.Rasterize(svgData, targetWidth)
 	if err != nil {
-		return "", fmt.Errorf("resvg failed: %w\n%s", err, string(resvgOut))
+		return "", fmt.Errorf("rasterize gitGraph svg: %w", err)
 	}
-
+	if err := os.WriteFile(outputPath, pngData, 0600); err != nil { // #nosec G703 -- outputPath from filepath.Join(workDir, hash+".png")
+		return "", fmt.Errorf("write gitGraph png: %w", err)
+	}
 	return outputPath, nil
 }
 

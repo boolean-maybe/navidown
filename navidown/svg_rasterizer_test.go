@@ -6,7 +6,6 @@ import (
 	"image/png"
 	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -38,16 +37,15 @@ func TestIsSVGData(t *testing.T) {
 	}
 }
 
-func TestResvgRasterizer(t *testing.T) {
-	if _, err := exec.LookPath("resvg"); err != nil {
-		t.Skip("resvg not found in PATH, skipping integration test")
-	}
-
+func TestWasmRasterizer(t *testing.T) {
 	svg := []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
 		<rect width="100" height="100" fill="red"/>
 	</svg>`)
 
-	rast := &ResvgRasterizer{}
+	rast, err := sharedWasmRasterizer()
+	if err != nil {
+		t.Fatalf("sharedWasmRasterizer: %v", err)
+	}
 	pngData, err := rast.Rasterize(svg, 200)
 	if err != nil {
 		t.Fatalf("Rasterize: %v", err)

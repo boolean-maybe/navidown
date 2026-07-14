@@ -6,11 +6,12 @@ import (
 	"encoding/xml"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+
+	resvg "github.com/boolean-maybe/go-resvg"
 )
 
 // SVGRasterizer converts SVG data into raster PNG bytes.
@@ -18,113 +19,40 @@ type SVGRasterizer interface {
 	Rasterize(svgData []byte, targetWidth int) ([]byte, error)
 }
 
-// ResvgRasterizer rasterizes SVG via the `resvg` CLI tool.
-type ResvgRasterizer struct {
-	familyOnce sync.Once
-	sansSerif  string
-	serif      string
-	monospace  string
+// WasmRasterizer rasterizes SVG via the embedded go-resvg WASM module.
+// text renders in DejaVu Sans only; named/serif/mono families are not substituted.
+type WasmRasterizer struct {
+	renderer *resvg.Renderer
 }
 
-// resvg's built-in generic-to-real-family map targets Windows/macOS font
-// names (Arial, Times New Roman, Courier New). On Linux/Docker those aren't
-// installed, and SVG text silently renders as nothing. Probe resvg's loaded
-// font database at first use and pick real families that are actually present.
-// Preference order favors the Microsoft-metric fonts (so macOS keeps its
-// existing look) with DejaVu/Liberation as Linux fallbacks.
 var (
-	sansSerifPrefs = []string{"Arial", "Helvetica", "Liberation Sans", "DejaVu Sans"}
-	serifPrefs     = []string{"Times New Roman", "Times", "Liberation Serif", "DejaVu Serif"}
-	monospacePrefs = []string{"Courier New", "Courier", "Liberation Mono", "DejaVu Sans Mono"}
+	sharedRasterizerOnce sync.Once
+	sharedRasterizer     *WasmRasterizer
+	sharedRasterizerErr  error
 )
 
-func (r *ResvgRasterizer) Rasterize(svgData []byte, targetWidth int) ([]byte, error) {
-	resvgPath, err := exec.LookPath("resvg")
-	if err != nil {
-		return nil, fmt.Errorf("resvg not found in PATH: %w", err)
-	}
-
-	r.familyOnce.Do(func() { r.probeFamilies(resvgPath) })
-
-	args := []string{"-w", strconv.Itoa(targetWidth)}
-	if r.sansSerif != "" {
-		args = append(args, "--sans-serif-family", r.sansSerif)
-	}
-	if r.serif != "" {
-		args = append(args, "--serif-family", r.serif)
-	}
-	if r.monospace != "" {
-		args = append(args, "--monospace-family", r.monospace)
-	}
-	args = append(args, "-", "-c")
-
-	cmd := exec.Command(resvgPath, args...) // #nosec G204 -- resvgPath from LookPath("resvg")
-	cmd.Stdin = bytes.NewReader(svgData)
-
-	out, err := cmd.Output()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return nil, fmt.Errorf("resvg failed: %s", exitErr.Stderr)
+// sharedWasmRasterizer returns one process-wide WasmRasterizer. go-resvg compiles
+// the wasm module once globally and pools instances internally, so a single shared
+// renderer keeps memory bounded across both the image and mermaid rasterization paths.
+func sharedWasmRasterizer() (*WasmRasterizer, error) {
+	sharedRasterizerOnce.Do(func() {
+		r, err := resvg.New()
+		if err != nil {
+			sharedRasterizerErr = err
+			return
 		}
-		return nil, fmt.Errorf("resvg: %w", err)
-	}
-
-	return out, nil
+		sharedRasterizer = &WasmRasterizer{renderer: r}
+	})
+	return sharedRasterizer, sharedRasterizerErr
 }
 
-// probeFamilies runs `resvg --list-fonts` and picks real family names for
-// the three generic categories. Silent failure is fine — rasterization will
-// still run with resvg's built-in defaults, and macOS users will be unaffected.
-func (r *ResvgRasterizer) probeFamilies(resvgPath string) {
-	cmd := exec.Command(resvgPath, "--list-fonts") // #nosec G204 -- resvgPath from LookPath
-	out, err := cmd.Output()
+// Rasterize renders svgData to PNG at targetWidth, preserving aspect ratio.
+func (w *WasmRasterizer) Rasterize(svgData []byte, targetWidth int) ([]byte, error) {
+	pngData, err := w.renderer.RenderPNG(svgData, resvg.RenderOptions{Width: targetWidth})
 	if err != nil {
-		return
+		return nil, fmt.Errorf("wasm rasterize: %w", err)
 	}
-	available := parseResvgFontList(out)
-	r.sansSerif = pickFamily(available, sansSerifPrefs)
-	r.serif = pickFamily(available, serifPrefs)
-	r.monospace = pickFamily(available, monospacePrefs)
-}
-
-// parseResvgFontList extracts family names from the output of
-// `resvg --list-fonts`. Each loaded-font line has the shape:
-//
-//	/path/to/font.ttf: 'Family Name (locale)', 0, Normal, 400, Normal
-//
-// We collect the bare family name (stripping the parenthesized locale).
-func parseResvgFontList(out []byte) map[string]struct{} {
-	families := make(map[string]struct{})
-	for _, line := range strings.Split(string(out), "\n") {
-		start := strings.IndexByte(line, '\'')
-		if start < 0 {
-			continue
-		}
-		end := strings.IndexByte(line[start+1:], '\'')
-		if end < 0 {
-			continue
-		}
-		name := line[start+1 : start+1+end]
-		if paren := strings.LastIndex(name, " ("); paren > 0 {
-			name = name[:paren]
-		}
-		name = strings.TrimSpace(name)
-		if name != "" {
-			families[name] = struct{}{}
-		}
-	}
-	return families
-}
-
-// pickFamily returns the first entry in prefs that is present in available,
-// or "" if none match.
-func pickFamily(available map[string]struct{}, prefs []string) string {
-	for _, p := range prefs {
-		if _, ok := available[p]; ok {
-			return p
-		}
-	}
-	return ""
+	return pngData, nil
 }
 
 // CachingSVGRasterizer wraps an SVGRasterizer with a persistent disk cache
@@ -172,7 +100,7 @@ func (c *CachingSVGRasterizer) Rasterize(svgData []byte, targetWidth int) ([]byt
 
 	// disk cache
 	diskPath := filepath.Join(c.workDir, key+".png")
-	if data, err := os.ReadFile(diskPath); err == nil {
+	if data, err := os.ReadFile(diskPath); err == nil { // #nosec G703 -- diskPath from filepath.Join(workDir, hash+".png")
 		c.cache.Store(key, data)
 		return data, nil
 	}
@@ -184,7 +112,7 @@ func (c *CachingSVGRasterizer) Rasterize(svgData []byte, targetWidth int) ([]byt
 	}
 
 	// write to disk (best effort)
-	_ = os.WriteFile(diskPath, pngData, 0600)
+	_ = os.WriteFile(diskPath, pngData, 0600) // #nosec G703 -- diskPath from filepath.Join(workDir, hash+".png")
 
 	c.cache.Store(key, pngData)
 	return pngData, nil
