@@ -148,6 +148,10 @@ func (r *ImageResolver) Close() {
 }
 
 func (r *ImageResolver) rasterizeSVG(data []byte) ([]byte, error) {
+	// give unregistered serif/monospace families a sans-serif fallback so
+	// their text renders in DejaVu Sans instead of vanishing.
+	data = normalizeSVGFonts(data)
+
 	if r.darkMode {
 		data = preprocessSVGForDarkMode(data)
 	}
