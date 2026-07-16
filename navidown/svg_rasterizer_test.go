@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -482,6 +483,69 @@ func TestImageResolver_PreResolve(t *testing.T) {
 		if info == nil {
 			t.Errorf("Resolve(%q) returned nil info", name)
 		}
+	}
+}
+
+func TestPreResolve_ProgressCallback(t *testing.T) {
+	dir := t.TempDir()
+	pngBytes := make1x1PNG()
+	for _, name := range []string{"a.png", "b.png", "c.png"} {
+		if err := os.WriteFile(filepath.Join(dir, name), pngBytes, 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	resolver := NewImageResolver([]string{dir})
+	sourceFile := filepath.Join(dir, "doc.md")
+
+	var mu sync.Mutex
+	var lastDone, lastTotal, calls int
+	resolver.SetProgressCallback(func(done, total int) {
+		mu.Lock()
+		defer mu.Unlock()
+		calls++
+		lastDone = done
+		lastTotal = total
+	})
+
+	resolver.PreResolve([]string{"a.png", "b.png", "c.png"}, sourceFile)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if calls != 3 || lastTotal != 3 || lastDone != 3 {
+		t.Fatalf("got calls=%d last=(%d/%d), want 3 (3/3)", calls, lastDone, lastTotal)
+	}
+}
+
+func TestPreResolve_ProgressCallback_CountsCached(t *testing.T) {
+	dir := t.TempDir()
+	pngBytes := make1x1PNG()
+	if err := os.WriteFile(filepath.Join(dir, "a.png"), pngBytes, 0644); err != nil {
+		t.Fatal(err)
+	}
+	resolver := NewImageResolver([]string{dir})
+	sourceFile := filepath.Join(dir, "doc.md")
+
+	// warm the cache so a.png is already resolved on the second PreResolve
+	if _, err := resolver.Resolve("a.png", sourceFile); err != nil {
+		t.Fatal(err)
+	}
+
+	var mu sync.Mutex
+	var lastDone, lastTotal int
+	resolver.SetProgressCallback(func(done, total int) {
+		mu.Lock()
+		defer mu.Unlock()
+		lastDone = done
+		lastTotal = total
+	})
+	// cached URL must still count toward progress so the bar reaches 100%
+	resolver.PreResolve([]string{"a.png"}, sourceFile)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if lastDone != 1 || lastTotal != 1 {
+		t.Fatalf("cached url progress = (%d/%d), want (1/1)", lastDone, lastTotal)
 	}
 }
 

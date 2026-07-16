@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"sync/atomic"
 
 	_ "golang.org/x/image/bmp"  // Register BMP decoder
 	_ "golang.org/x/image/tiff" // Register TIFF decoder
@@ -38,6 +39,10 @@ type ImageResolver struct {
 	svgRasterWidth int
 	svgScaleFactor float64
 	darkMode       bool
+
+	// progressCB, if set, is called after each image resolves during
+	// PreResolve with (done, total). Set once before PreResolve runs.
+	progressCB func(done, total int)
 }
 
 // NewImageResolver creates a new resolver.
@@ -73,6 +78,13 @@ func (r *ImageResolver) SetDarkMode(dm bool) {
 	r.darkMode = dm
 }
 
+// SetProgressCallback registers a per-item progress callback for PreResolve.
+// The callback receives (done, total) after each url resolves, where total is
+// the full url count for the PreResolve call. Set it before calling PreResolve.
+func (r *ImageResolver) SetProgressCallback(cb func(done, total int)) {
+	r.progressCB = cb
+}
+
 // Resolve fetches an image and returns its info. Results are cached.
 func (r *ImageResolver) Resolve(url string, sourceFilePath string) (*ImageInfo, error) {
 	// Check cache first
@@ -104,21 +116,27 @@ func (r *ImageResolver) Resolve(url string, sourceFilePath string) (*ImageInfo, 
 
 // PreResolve resolves multiple image URLs in parallel, populating the cache.
 // Errors are silently ignored — individual Resolve calls will re-attempt.
+// When a progress callback is set, every url counts toward progress (cached
+// ones included) so a determinate bar always reaches total.
 func (r *ImageResolver) PreResolve(urls []string, sourceFilePath string) {
 	if len(urls) == 0 {
 		return
 	}
 
+	total := len(urls)
+	var done int64
 	var wg sync.WaitGroup
 	for _, u := range urls {
-		// skip already-cached URLs
-		if _, ok := r.cache.Load(u); ok {
-			continue
-		}
 		wg.Add(1)
 		go func(url string) {
 			defer wg.Done()
-			_, _ = r.Resolve(url, sourceFilePath)
+			if _, ok := r.cache.Load(url); !ok {
+				_, _ = r.Resolve(url, sourceFilePath)
+			}
+			if r.progressCB != nil {
+				n := int(atomic.AddInt64(&done, 1))
+				r.progressCB(n, total)
+			}
 		}(u)
 	}
 	wg.Wait()

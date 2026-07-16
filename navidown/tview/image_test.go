@@ -1,11 +1,135 @@
 package tview
 
 import (
+	"bytes"
+	"image"
+	"image/png"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
 	nav "github.com/boolean-maybe/navidown/navidown"
 )
+
+func testPNGBytes() []byte {
+	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	img.Set(0, 0, image.Black)
+	var buf bytes.Buffer
+	_ = png.Encode(&buf, img)
+	return buf.Bytes()
+}
+
+func TestImageManager_PreResolveMarkdown(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "pic.png"), testPNGBytes(), 0644); err != nil {
+		t.Fatal(err)
+	}
+	sourceFile := filepath.Join(dir, "doc.md")
+
+	resolver := nav.NewImageResolver([]string{dir})
+	mgr := NewImageManager(resolver, 8, 16)
+
+	var mu sync.Mutex
+	var lastDone, lastTotal, calls int
+	mgr.SetProgressCallback(func(done, total int) {
+		mu.Lock()
+		defer mu.Unlock()
+		calls++
+		lastDone, lastTotal = done, total
+	})
+
+	// pre-resolving raw markdown must warm the resolver cache and fire the
+	// progress callback, without touching any widget.
+	mgr.PreResolveMarkdown("![pic](pic.png)\n", sourceFile, 80, nil, nil)
+
+	mu.Lock()
+	gotCalls, gotDone, gotTotal := calls, lastDone, lastTotal
+	mu.Unlock()
+	if gotCalls != 1 || gotDone != 1 || gotTotal != 1 {
+		t.Fatalf("callback fired calls=%d last=(%d/%d), want 1 (1/1)", gotCalls, gotDone, gotTotal)
+	}
+
+	// the image must now be a cache hit
+	info, err := resolver.Resolve("pic.png", sourceFile)
+	if err != nil || info == nil {
+		t.Fatalf("image not cached after PreResolveMarkdown: info=%v err=%v", info, err)
+	}
+}
+
+// writeFakeDot writes a shell script that behaves like `dot`: it copies a PNG
+// fixture to the path given after -o. Returns the script path. Skips on Windows.
+func writeFakeDot(t *testing.T, dir string) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("fake dot script is POSIX-only")
+	}
+	fixture := filepath.Join(dir, "fixture.png")
+	if err := os.WriteFile(fixture, testPNGBytes(), 0644); err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(dir, "fake-dot")
+	body := "#!/bin/sh\n" +
+		"out=\"\"\n" +
+		"while [ $# -gt 0 ]; do\n" +
+		"  case \"$1\" in\n" +
+		"    -o) shift; out=\"$1\" ;;\n" +
+		"    -o*) out=\"${1#-o}\" ;;\n" +
+		"  esac\n" +
+		"  shift\n" +
+		"done\n" +
+		"cp \"" + fixture + "\" \"$out\"\n"
+	if err := os.WriteFile(script, []byte(body), 0755); err != nil { //nolint:gosec // test fixture
+		t.Fatal(err)
+	}
+	return script
+}
+
+// TestImageManager_PreResolveMarkdown_RendersDiagram proves PreResolveMarkdown
+// pre-renders diagram blocks off the widget when GraphvizOptions are supplied,
+// so the expensive dot subprocess runs during the off-thread pre-resolve.
+func TestImageManager_PreResolveMarkdown_RendersDiagram(t *testing.T) {
+	dir := t.TempDir()
+	dotPath := writeFakeDot(t, dir)
+	cacheDir := t.TempDir()
+
+	resolver := nav.NewImageResolver([]string{dir})
+	mgr := NewImageManager(resolver, 8, 16)
+
+	md := "```dot\ndigraph { a -> b }\n```\n"
+	mgr.PreResolveMarkdown(md, filepath.Join(dir, "doc.md"), 80, nil,
+		&nav.GraphvizOptions{DotPath: dotPath, CacheDir: cacheDir})
+
+	// the diagram must have been rendered to a PNG in the graphviz cache dir.
+	entries, err := os.ReadDir(cacheDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pngs := 0
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) == ".png" {
+			pngs++
+		}
+	}
+	if pngs == 0 {
+		t.Fatalf("PreResolveMarkdown did not pre-render the dot diagram (no PNG in cache %s)", cacheDir)
+	}
+}
+
+func TestImageManager_PreResolveMarkdown_NoImages(t *testing.T) {
+	resolver := nav.NewImageResolver([]string{t.TempDir()})
+	mgr := NewImageManager(resolver, 8, 16)
+	fired := false
+	mgr.SetProgressCallback(func(int, int) { fired = true })
+
+	// markdown with no images must not fire progress.
+	mgr.PreResolveMarkdown("# just text\n\nno pictures here\n", "", 80, nil, nil)
+	if fired {
+		t.Fatal("progress callback fired for markdown with no images")
+	}
+}
 
 func TestBuildPlaceholderLines(t *testing.T) {
 	placeholder := &nav.ImagePlaceholder{

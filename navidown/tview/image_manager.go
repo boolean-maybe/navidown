@@ -161,10 +161,47 @@ func (m *ImageManager) DetectSupport(screen tcell.Screen) {
 	m.SetSupported(true)
 }
 
+// SetProgressCallback forwards a per-image progress callback to the resolver.
+// It is invoked with (done, total) as each image resolves during
+// PreResolveImages. Set it on the manager once rather than threading a
+// parameter through every pre-resolve call layer.
+func (m *ImageManager) SetProgressCallback(cb func(done, total int)) {
+	m.resolver.SetProgressCallback(cb)
+}
+
 // PreResolveImages resolves multiple image URLs in parallel, warming the cache.
 // Subsequent ResolveAndAllocate calls for these URLs will be fast cache hits.
 func (m *ImageManager) PreResolveImages(urls []string, sourceFilePath string) {
 	m.resolver.PreResolve(urls, sourceFilePath)
+}
+
+// PreResolveMarkdown renders content to lines with a throwaway session bound to
+// this manager, warming the resolver cache for every image the markdown
+// references AND pre-rendering any mermaid/graphviz diagram blocks (when the
+// corresponding options are supplied) so their expensive mmdc/dot subprocesses
+// run here, off the UI goroutine. It mutates no widget, so callers can run it on
+// a background goroutine before doing the fast, cache-warm render on the UI
+// goroutine. maxCols is the layout width used for the rendering pass; mermaid
+// and graphviz may be nil to skip diagram pre-rendering.
+func (m *ImageManager) PreResolveMarkdown(
+	content, sourceFilePath string,
+	maxCols int,
+	mermaid *nav.MermaidOptions,
+	graphviz *nav.GraphvizOptions,
+) {
+	if maxCols <= 0 {
+		maxCols = 80
+	}
+	session := nav.New(nav.Options{
+		ImagePostProcessor: NewKittyImageProcessor(m),
+		MermaidOptions:     mermaid,
+		GraphvizOptions:    graphviz,
+	})
+	session.SetWidth(maxCols)
+	// the render pre-renders diagrams (preprocessForRender) and pre-resolves
+	// every image url (ProcessImageTokens) — the slow, thread-safe work — with
+	// no TextView mutation.
+	_ = session.SetMarkdownWithSource(content, sourceFilePath, false)
 }
 
 // ResolveAndAllocate resolves an image URL and assigns it a Kitty image ID.
