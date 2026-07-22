@@ -636,3 +636,36 @@ func TestResolveCacheDir(t *testing.T) {
 		}
 	})
 }
+
+func TestEffectiveScale(t *testing.T) {
+	cases := []struct {
+		name      string
+		minWidth  int
+		baseScale int
+		natural   int
+		want      int
+	}{
+		{"disabled returns base", 0, 2, 110, 2},
+		{"unknown natural returns base", 400, 2, 0, 2},
+		{"narrow boosts to ceil", 400, 2, 110, 4},   // ceil(400/110)=4
+		{"already wide keeps base", 400, 2, 800, 2}, // ceil(400/800)=1 -> base
+		{"thin clamps to ceiling", 400, 2, 30, 6},   // ceil(400/30)=14 -> 6
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &MermaidRenderer{opts: MermaidOptions{MinDiagramWidth: tc.minWidth, Scale: tc.baseScale}}
+			if got := r.effectiveScale(tc.natural); got != tc.want {
+				t.Fatalf("effectiveScale(%d) = %d, want %d", tc.natural, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCacheKeyVariesWithMinDiagramWidth(t *testing.T) {
+	src := "stateDiagram-v2\n[*] --> Boot\nBoot --> [*]\n"
+	r0 := &MermaidRenderer{opts: MermaidOptions{Scale: 2, MinDiagramWidth: 0}}
+	r1 := &MermaidRenderer{opts: MermaidOptions{Scale: 2, MinDiagramWidth: 400}}
+	if r0.cacheKey(src) == r1.cacheKey(src) {
+		t.Fatal("cache key must differ when MinDiagramWidth changes the effective scale")
+	}
+}

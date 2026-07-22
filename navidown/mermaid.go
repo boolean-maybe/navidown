@@ -47,6 +47,7 @@ type MermaidOptions struct {
 	BackgroundColor string        // background color; "" = "transparent"
 	Scale           int           // render scale; 0 = 2 (retina)
 	Width           int           // page width in CSS pixels; 0 = 600
+	MinDiagramWidth int           // min rasterized width in px for narrow diagrams; 0 = disabled
 	Timeout         time.Duration // render timeout; 0 = 30s
 	CacheDir        string        // persistent cache dir; "" = auto (os.UserCacheDir()/navidown/mermaid)
 }
@@ -70,6 +71,29 @@ func (o *MermaidOptions) resolvedScale() int {
 		return o.Scale
 	}
 	return 2
+}
+
+// scaleCeiling bounds the MinDiagramWidth scale boost so a pathologically thin
+// diagram cannot demand a huge scale and produce an oversized PNG.
+const scaleCeiling = 6
+
+// effectiveScale returns the mmdc scale to use so a diagram of the given natural
+// width rasterizes to at least MinDiagramWidth px. It clamps to
+// [resolvedScale, scaleCeiling]. Returns resolvedScale when MinDiagramWidth is
+// disabled or the natural width is unknown.
+func (r *MermaidRenderer) effectiveScale(natural int) int {
+	base := r.opts.resolvedScale()
+	if r.opts.MinDiagramWidth <= 0 || natural <= 0 {
+		return base
+	}
+	needed := (r.opts.MinDiagramWidth + natural - 1) / natural // ceil division
+	if needed < base {
+		return base
+	}
+	if needed > scaleCeiling {
+		return scaleCeiling
+	}
+	return needed
 }
 
 func (o *MermaidOptions) resolvedWidth() int {
@@ -478,7 +502,7 @@ func (r *MermaidRenderer) configForSource(source string) (configPath, cssPath st
 // (theme, background, scale) so that option changes don't produce stale hits.
 // cacheVersion must be bumped when post-processing logic changes, since
 // post-processing runs after the cache key is computed from inputs.
-const cacheVersion = "v18"
+const cacheVersion = "v19"
 
 func (r *MermaidRenderer) cacheKey(source string) string {
 	h := sha256.New()
@@ -520,6 +544,8 @@ func (r *MermaidRenderer) cacheKey(source string) string {
 	h.Write([]byte(r.opts.resolvedBackground()))
 	h.Write([]byte{0})
 	_, _ = fmt.Fprintf(h, "%d", r.opts.resolvedScale())
+	h.Write([]byte{0})
+	_, _ = fmt.Fprintf(h, "min=%d", r.opts.MinDiagramWidth)
 	h.Write([]byte{0})
 	_, _ = fmt.Fprintf(h, "%d", r.widthForSource(source))
 	h.Write([]byte{0})
@@ -582,6 +608,7 @@ func (r *MermaidRenderer) RenderToFile(source string) (string, error) {
 	// natural width, then render to PNG at that width so Puppeteer doesn't
 	// shrink large diagrams to fit a narrow viewport.
 	width := r.naturalWidth(ctx, inputPath, cfgPath, css, source)
+	scale := r.effectiveScale(width)
 
 	cmd := exec.CommandContext(ctx, r.mmdcPath, // #nosec G204 -- mmdcPath from LookPath("mmdc") or user-provided
 		"-i", inputPath,
@@ -590,7 +617,7 @@ func (r *MermaidRenderer) RenderToFile(source string) (string, error) {
 		"-C", css,
 		"-b", r.opts.resolvedBackground(),
 		"-w", fmt.Sprintf("%d", width),
-		"-s", fmt.Sprintf("%d", r.opts.resolvedScale()),
+		"-s", fmt.Sprintf("%d", scale),
 	)
 
 	out, err := cmd.CombinedOutput()
