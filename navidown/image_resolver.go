@@ -306,6 +306,36 @@ func (info *ImageInfo) ResizedPNG(targetW, targetH int) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// PNGData returns the image encoded as PNG, downscaled to targetW x targetH when
+// the source exceeds those dimensions. The Kitty graphics protocol accepts only
+// PNG (f=100) or raw RGB/RGBA — never GIF/JPEG/etc — so a non-PNG source must be
+// re-encoded even when no resize is needed, otherwise the terminal receives
+// GIF/JPEG bytes under a PNG header and silently draws nothing. Already-PNG data
+// within the target passes through untouched.
+func (info *ImageInfo) PNGData(targetW, targetH int) ([]byte, error) {
+	if targetW > 0 && targetH > 0 && (info.Width > targetW || info.Height > targetH) {
+		return info.ResizedPNG(targetW, targetH)
+	}
+	if info.Format == "png" {
+		return info.Data, nil
+	}
+	return info.encodePNG()
+}
+
+// encodePNG decodes the source image (first frame for animated formats) and
+// re-encodes it as PNG without resizing.
+func (info *ImageInfo) encodePNG() ([]byte, error) {
+	src, _, err := image.Decode(bytes.NewReader(info.Data))
+	if err != nil {
+		return nil, fmt.Errorf("decode for png re-encode: %w", err)
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, src); err != nil {
+		return nil, fmt.Errorf("encode png: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
 // CellDimensions calculates how many terminal columns and rows an image
 // should occupy given the available width and an assumed cell aspect ratio.
 // cellWidth and cellHeight are in pixels (typical: 8x16 or 10x20).

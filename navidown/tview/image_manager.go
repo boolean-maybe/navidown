@@ -300,11 +300,13 @@ func (m *ImageManager) EnsureTransmitted(screen tcell.Screen, id uint32) {
 	// 8px when the terminal doesn't report pixel dimensions).
 	targetW := cols * m.cellWidth * 2
 	targetH := rows * m.cellHeight * 2
+	// always normalize to PNG: the protocol accepts only PNG/RGB/RGBA, so a
+	// non-PNG source (GIF/JPEG) must be re-encoded even when no downscale is
+	// needed. PNGData downscales oversized images and passes already-PNG data
+	// within the target through untouched.
 	data := info.Data
-	if targetW > 0 && targetH > 0 && (info.Width > targetW || info.Height > targetH) {
-		if resized, err := info.ResizedPNG(targetW, targetH); err == nil {
-			data = resized
-		}
+	if pngData, err := info.PNGData(targetW, targetH); err == nil {
+		data = pngData
 	}
 
 	if err := transmitImage(tty, id, data, cols, rows); err != nil {
@@ -458,7 +460,7 @@ func transmitImage(w io.Writer, id uint32, data []byte, cols, rows int) error {
 		var cmd string
 		if isFirst && isLast {
 			// a=T: transmit and display; U=1: unicode/virtual placement;
-			// c=/r=: cell grid dimensions for scaling; f=100: auto-detect format
+			// c=/r=: cell grid dimensions for scaling; f=100: PNG data
 			cmd = fmt.Sprintf("\x1b_Ga=T,q=2,U=1,i=%d,f=100,t=d,c=%d,r=%d;%s\x1b\\", id, cols, rows, chunk)
 		} else if isFirst {
 			cmd = fmt.Sprintf("\x1b_Ga=T,q=2,U=1,i=%d,f=100,t=d,c=%d,r=%d,m=1;%s\x1b\\", id, cols, rows, chunk)
